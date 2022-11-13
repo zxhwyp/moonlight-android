@@ -8,7 +8,7 @@
 #include <opus_multistream.h>
 #include <android/log.h>
 
-static OpusMSDecoder* Decoder;
+static OpusMSDecoder *Decoder;
 static OPUS_MULTISTREAM_CONFIGURATION OpusConfig;
 
 static JavaVM *JVM;
@@ -36,7 +36,7 @@ static jmethodID BridgeClSetHdrModeMethod;
 static jbyteArray DecodedFrameBuffer;
 static jshortArray DecodedAudioBuffer;
 
-void DetachThread(void* context) {
+void DetachThread(void *context) {
     (*JVM)->DetachCurrentThread(JVM);
 }
 
@@ -47,11 +47,11 @@ void JniEnvKeyInit(void) {
     pthread_key_create(&JniEnvKey, DetachThread);
 }
 
-JNIEnv* GetThreadEnv(void) {
-    JNIEnv* env;
+JNIEnv *GetThreadEnv(void) {
+    JNIEnv *env;
 
     // First check if this is already attached to the JVM
-    if ((*JVM)->GetEnv(JVM, (void**)&env, JNI_VERSION_1_4) == JNI_OK) {
+    if ((*JVM)->GetEnv(JVM, (void **) &env, JNI_VERSION_1_4) == JNI_OK) {
         return env;
     }
 
@@ -75,37 +75,49 @@ JNIEnv* GetThreadEnv(void) {
 JNIEXPORT void JNICALL
 Java_com_limelight_nvstream_jni_MoonBridge_init(JNIEnv *env, jclass clazz) {
     (*env)->GetJavaVM(env, &JVM);
-    GlobalBridgeClass = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "com/limelight/nvstream/jni/MoonBridge"));
+    GlobalBridgeClass = (*env)->NewGlobalRef(env, (*env)->FindClass(env,
+                                                                    "com/limelight/nvstream/jni/MoonBridge"));
     BridgeDrSetupMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeDrSetup", "(IIII)I");
     BridgeDrStartMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeDrStart", "()V");
     BridgeDrStopMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeDrStop", "()V");
     BridgeDrCleanupMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeDrCleanup", "()V");
-    BridgeDrSubmitDecodeUnitMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeDrSubmitDecodeUnit", "([BIIIIJJ)I");
+    BridgeDrSubmitDecodeUnitMethod = (*env)->GetStaticMethodID(env, clazz,
+                                                               "bridgeDrSubmitDecodeUnit",
+                                                               "([BIIIIJJ)I");
     BridgeArInitMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeArInit", "(III)I");
     BridgeArStartMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeArStart", "()V");
     BridgeArStopMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeArStop", "()V");
     BridgeArCleanupMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeArCleanup", "()V");
     BridgeArPlaySampleMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeArPlaySample", "([S)V");
-    BridgeClStageStartingMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClStageStarting", "(I)V");
-    BridgeClStageCompleteMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClStageComplete", "(I)V");
-    BridgeClStageFailedMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClStageFailed", "(II)V");
-    BridgeClConnectionStartedMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClConnectionStarted", "()V");
-    BridgeClConnectionTerminatedMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClConnectionTerminated", "(I)V");
+    BridgeClStageStartingMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClStageStarting",
+                                                            "(I)V");
+    BridgeClStageCompleteMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClStageComplete",
+                                                            "(I)V");
+    BridgeClStageFailedMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClStageFailed",
+                                                          "(II)V");
+    BridgeClConnectionStartedMethod = (*env)->GetStaticMethodID(env, clazz,
+                                                                "bridgeClConnectionStarted", "()V");
+    BridgeClConnectionTerminatedMethod = (*env)->GetStaticMethodID(env, clazz,
+                                                                   "bridgeClConnectionTerminated",
+                                                                   "(I)V");
     BridgeClRumbleMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClRumble", "(SSS)V");
-    BridgeClConnectionStatusUpdateMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClConnectionStatusUpdate", "(I)V");
+    BridgeClConnectionStatusUpdateMethod = (*env)->GetStaticMethodID(env, clazz,
+                                                                     "bridgeClConnectionStatusUpdate",
+                                                                     "(I)V");
     BridgeClSetHdrModeMethod = (*env)->GetStaticMethodID(env, clazz, "bridgeClSetHdrMode", "(Z)V");
 }
 
-int BridgeDrSetup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags) {
-    JNIEnv* env = GetThreadEnv();
+int
+BridgeDrSetup(int videoFormat, int width, int height, int redrawRate, void *context, int drFlags) {
+    JNIEnv *env = GetThreadEnv();
     int err;
 
-    err = (*env)->CallStaticIntMethod(env, GlobalBridgeClass, BridgeDrSetupMethod, videoFormat, width, height, redrawRate);
+    err = (*env)->CallStaticIntMethod(env, GlobalBridgeClass, BridgeDrSetupMethod, videoFormat,
+                                      width, height, redrawRate);
     if ((*env)->ExceptionCheck(env)) {
         // This is called on a Java thread, so it's safe to return
         return -1;
-    }
-    else if (err != 0) {
+    } else if (err != 0) {
         return err;
     }
 
@@ -116,19 +128,19 @@ int BridgeDrSetup(int videoFormat, int width, int height, int redrawRate, void* 
 }
 
 void BridgeDrStart(void) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeDrStartMethod);
 }
 
 void BridgeDrStop(void) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeDrStopMethod);
 }
 
 void BridgeDrCleanup(void) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->DeleteGlobalRef(env, DecodedFrameBuffer);
 
@@ -136,13 +148,14 @@ void BridgeDrCleanup(void) {
 }
 
 int BridgeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
     int ret;
 
     // Increase the size of our frame data buffer if our frame won't fit
     if ((*env)->GetArrayLength(env, DecodedFrameBuffer) < decodeUnit->fullLength) {
         (*env)->DeleteGlobalRef(env, DecodedFrameBuffer);
-        DecodedFrameBuffer = (*env)->NewGlobalRef(env, (*env)->NewByteArray(env, decodeUnit->fullLength));
+        DecodedFrameBuffer = (*env)->NewGlobalRef(env, (*env)->NewByteArray(env,
+                                                                            decodeUnit->fullLength));
     }
 
     PLENTRY currentEntry;
@@ -155,23 +168,26 @@ int BridgeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) {
         if (currentEntry->bufferType != BUFFER_TYPE_PICDATA) {
             // Use the beginning of the buffer each time since this is a separate
             // invocation of the decoder each time.
-            (*env)->SetByteArrayRegion(env, DecodedFrameBuffer, 0, currentEntry->length, (jbyte*)currentEntry->data);
+            (*env)->SetByteArrayRegion(env, DecodedFrameBuffer, 0, currentEntry->length,
+                                       (jbyte *) currentEntry->data);
 
-            ret = (*env)->CallStaticIntMethod(env, GlobalBridgeClass, BridgeDrSubmitDecodeUnitMethod,
-                                              DecodedFrameBuffer, currentEntry->length, currentEntry->bufferType,
+            ret = (*env)->CallStaticIntMethod(env, GlobalBridgeClass,
+                                              BridgeDrSubmitDecodeUnitMethod,
+                                              DecodedFrameBuffer, currentEntry->length,
+                                              currentEntry->bufferType,
                                               decodeUnit->frameNumber, decodeUnit->frameType,
-                                              (jlong)decodeUnit->receiveTimeMs, (jlong)decodeUnit->enqueueTimeMs);
+                                              (jlong) decodeUnit->receiveTimeMs,
+                                              (jlong) decodeUnit->enqueueTimeMs);
             if ((*env)->ExceptionCheck(env)) {
                 // We will crash here
                 (*JVM)->DetachCurrentThread(JVM);
                 return DR_OK;
-            }
-            else if (ret != DR_OK) {
+            } else if (ret != DR_OK) {
                 return ret;
             }
-        }
-        else {
-            (*env)->SetByteArrayRegion(env, DecodedFrameBuffer, offset, currentEntry->length, (jbyte*)currentEntry->data);
+        } else {
+            (*env)->SetByteArrayRegion(env, DecodedFrameBuffer, offset, currentEntry->length,
+                                       (jbyte *) currentEntry->data);
             offset += currentEntry->length;
         }
 
@@ -179,24 +195,27 @@ int BridgeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) {
     }
 
     ret = (*env)->CallStaticIntMethod(env, GlobalBridgeClass, BridgeDrSubmitDecodeUnitMethod,
-                                       DecodedFrameBuffer, offset, BUFFER_TYPE_PICDATA,
-                                       decodeUnit->frameNumber, decodeUnit->frameType,
-                                       (jlong)decodeUnit->receiveTimeMs, (jlong)decodeUnit->enqueueTimeMs);
+                                      DecodedFrameBuffer, offset, BUFFER_TYPE_PICDATA,
+                                      decodeUnit->frameNumber, decodeUnit->frameType,
+                                      (jlong) decodeUnit->receiveTimeMs,
+                                      (jlong) decodeUnit->enqueueTimeMs);
     if ((*env)->ExceptionCheck(env)) {
         // We will crash here
         (*JVM)->DetachCurrentThread(JVM);
         return DR_OK;
-    }
-    else {
+    } else {
         return ret;
     }
 }
 
-int BridgeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, void* context, int flags) {
-    JNIEnv* env = GetThreadEnv();
+int BridgeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, void *context,
+                 int flags) {
+    JNIEnv *env = GetThreadEnv();
     int err;
 
-    err = (*env)->CallStaticIntMethod(env, GlobalBridgeClass, BridgeArInitMethod, audioConfiguration, opusConfig->sampleRate, opusConfig->samplesPerFrame);
+    err = (*env)->CallStaticIntMethod(env, GlobalBridgeClass, BridgeArInitMethod,
+                                      audioConfiguration, opusConfig->sampleRate,
+                                      opusConfig->samplesPerFrame);
     if ((*env)->ExceptionCheck(env)) {
         // This is called on a Java thread, so it's safe to return
         err = -1;
@@ -215,26 +234,28 @@ int BridgeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusCon
         }
 
         // We know ahead of time what the buffer size will be for decoded audio, so pre-allocate it
-        DecodedAudioBuffer = (*env)->NewGlobalRef(env, (*env)->NewShortArray(env, opusConfig->channelCount * opusConfig->samplesPerFrame));
+        DecodedAudioBuffer = (*env)->NewGlobalRef(env, (*env)->NewShortArray(env,
+                                                                             opusConfig->channelCount *
+                                                                             opusConfig->samplesPerFrame));
     }
 
     return err;
 }
 
 void BridgeArStart(void) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeArStartMethod);
 }
 
 void BridgeArStop(void) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeArStopMethod);
 }
 
 void BridgeArCleanup() {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     opus_multistream_decoder_destroy(Decoder);
 
@@ -243,13 +264,13 @@ void BridgeArCleanup() {
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeArCleanupMethod);
 }
 
-void BridgeArDecodeAndPlaySample(char* sampleData, int sampleLength) {
-    JNIEnv* env = GetThreadEnv();
+void BridgeArDecodeAndPlaySample(char *sampleData, int sampleLength) {
+    JNIEnv *env = GetThreadEnv();
 
-    jshort* decodedData = (*env)->GetPrimitiveArrayCritical(env, DecodedAudioBuffer, NULL);
+    jshort *decodedData = (*env)->GetPrimitiveArrayCritical(env, DecodedAudioBuffer, NULL);
 
     int decodeLen = opus_multistream_decode(Decoder,
-                                            (const unsigned char*)sampleData,
+                                            (const unsigned char *) sampleData,
                                             sampleLength,
                                             decodedData,
                                             OpusConfig.samplesPerFrame,
@@ -258,59 +279,63 @@ void BridgeArDecodeAndPlaySample(char* sampleData, int sampleLength) {
         // We must release the array elements before making further JNI calls
         (*env)->ReleasePrimitiveArrayCritical(env, DecodedAudioBuffer, decodedData, 0);
 
-        (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeArPlaySampleMethod, DecodedAudioBuffer);
+        (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeArPlaySampleMethod,
+                                     DecodedAudioBuffer);
         if ((*env)->ExceptionCheck(env)) {
             // We will crash here
             (*JVM)->DetachCurrentThread(JVM);
         }
-    }
-    else {
+    } else {
         // We can abort here to avoid the copy back since no data was modified
         (*env)->ReleasePrimitiveArrayCritical(env, DecodedAudioBuffer, decodedData, JNI_ABORT);
     }
 }
 
 void BridgeClStageStarting(int stage) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClStageStartingMethod, stage);
 }
 
 void BridgeClStageComplete(int stage) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClStageCompleteMethod, stage);
 }
 
 void BridgeClStageFailed(int stage, int errorCode) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
-    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClStageFailedMethod, stage, errorCode);
+    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClStageFailedMethod, stage,
+                                 errorCode);
 }
 
 void BridgeClConnectionStarted(void) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClConnectionStartedMethod);
 }
 
 void BridgeClConnectionTerminated(int errorCode) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
-    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClConnectionTerminatedMethod, errorCode);
+    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClConnectionTerminatedMethod,
+                                 errorCode);
     if ((*env)->ExceptionCheck(env)) {
         // We will crash here
         (*JVM)->DetachCurrentThread(JVM);
     }
 }
 
-void BridgeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor) {
-    JNIEnv* env = GetThreadEnv();
+void BridgeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor,
+                    unsigned short highFreqMotor) {
+    JNIEnv *env = GetThreadEnv();
 
     // The seemingly redundant short casts are required in order to convert the unsigned short to a signed short.
     // If we leave it as an unsigned short, CheckJNI will fail when the value exceeds 32767. The cast itself is
     // fine because the Java code treats the value as unsigned even though it's stored in a signed type.
-    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClRumbleMethod, controllerNumber, (short)lowFreqMotor, (short)highFreqMotor);
+    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClRumbleMethod, controllerNumber,
+                                 (short) lowFreqMotor, (short) highFreqMotor);
     if ((*env)->ExceptionCheck(env)) {
         // We will crash here
         (*JVM)->DetachCurrentThread(JVM);
@@ -318,9 +343,10 @@ void BridgeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor
 }
 
 void BridgeClConnectionStatusUpdate(int connectionStatus) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
-    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClConnectionStatusUpdateMethod, connectionStatus);
+    (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClConnectionStatusUpdateMethod,
+                                 connectionStatus);
     if ((*env)->ExceptionCheck(env)) {
         // We will crash here
         (*JVM)->DetachCurrentThread(JVM);
@@ -329,7 +355,7 @@ void BridgeClConnectionStatusUpdate(int connectionStatus) {
 }
 
 void BridgeClSetHdrMode(bool enabled) {
-    JNIEnv* env = GetThreadEnv();
+    JNIEnv *env = GetThreadEnv();
 
     (*env)->CallStaticVoidMethod(env, GlobalBridgeClass, BridgeClSetHdrModeMethod, enabled);
     if ((*env)->ExceptionCheck(env)) {
@@ -338,7 +364,7 @@ void BridgeClSetHdrMode(bool enabled) {
     }
 }
 
-void BridgeClLogMessage(const char* format, ...) {
+void BridgeClLogMessage(const char *format, ...) {
     va_list va;
     va_start(va, format);
     __android_log_vprint(ANDROID_LOG_INFO, "moonlight-common-c", format, va);
@@ -376,47 +402,69 @@ static CONNECTION_LISTENER_CALLBACKS BridgeConnListenerCallbacks = {
 
 JNIEXPORT jint JNICALL
 Java_com_limelight_nvstream_jni_MoonBridge_startConnection(JNIEnv *env, jclass clazz,
-                                                           jstring address, jstring appVersion, jstring gfeVersion,
-                                                           jstring rtspSessionUrl,
-                                                           jint width, jint height, jint fps,
-                                                           jint bitrate, jint packetSize, jint streamingRemotely,
-                                                           jint audioConfiguration, jboolean supportsHevc,
-                                                           jboolean enableHdr,
-                                                           jint hevcBitratePercentageMultiplier,
-                                                           jint clientRefreshRateX100,
-                                                           jint encryptionFlags,
-                                                           jbyteArray riAesKey, jbyteArray riAesIv,
-                                                           jint videoCapabilities) {
+                                                           jstring address, jstring app_version,
+                                                           jstring gfe_version,
+                                                           jstring rtsp_session_url, jint width,
+                                                           jint height, jint fps, jint bitrate,
+                                                           jint packet_size,
+                                                           jint streaming_remotely,
+                                                           jint audio_configuration,
+                                                           jboolean supports_hevc,
+                                                           jboolean enable_hdr,
+                                                           jint hevc_bitrate_percentage_multiplier,
+                                                           jint client_refresh_rate_x100,
+                                                           jint encryption_flags,
+                                                           jbyteArray ri_aes_key,
+                                                           jbyteArray ri_aes_iv,
+                                                           jint video_capabilities,
+                                                           jint audio_stream_udp_port,
+                                                           jint video_stream_udp_port,
+                                                           jint control_stream_udp_port,
+                                                           jint control_stream_tcp_port,
+                                                           jint input_stream_tcp_port,
+                                                           jint rtsp_tcp_port,
+                                                           jint resolve_host_name_tcpport,
+                                                           jint first_frame_tcp_port) {
     SERVER_INFORMATION serverInfo = {
             .address = (*env)->GetStringUTFChars(env, address, 0),
-            .serverInfoAppVersion = (*env)->GetStringUTFChars(env, appVersion, 0),
-            .serverInfoGfeVersion = gfeVersion ? (*env)->GetStringUTFChars(env, gfeVersion, 0) : NULL,
-            .rtspSessionUrl = rtspSessionUrl ? (*env)->GetStringUTFChars(env, rtspSessionUrl, 0) : NULL,
+            .serverInfoAppVersion = (*env)->GetStringUTFChars(env, app_version, 0),
+            .serverInfoGfeVersion = gfe_version ? (*env)->GetStringUTFChars(env, app_version, 0)
+                                               : NULL,
+            .rtspSessionUrl = rtsp_session_url ? (*env)->GetStringUTFChars(env, rtsp_session_url, 0)
+                                             : NULL,
+            .audioStreamUdpPort = audio_stream_udp_port,
+            .videoStreamUdpPort = video_stream_udp_port,
+            .controlStreamTcpPort = control_stream_tcp_port,
+            .controlStreamUdpPort = control_stream_udp_port,
+            .inputStreamTcpPort = input_stream_tcp_port,
+            .rtspTcpPort = rtsp_tcp_port,
+            .resolveHostNameTCPPort = resolve_host_name_tcpport,
+            .firstFrameTcpPort = first_frame_tcp_port,
     };
     STREAM_CONFIGURATION streamConfig = {
             .width = width,
             .height = height,
             .fps = fps,
             .bitrate = bitrate,
-            .packetSize = packetSize,
-            .streamingRemotely = streamingRemotely,
-            .audioConfiguration = audioConfiguration,
-            .supportsHevc = supportsHevc,
-            .enableHdr = enableHdr,
-            .hevcBitratePercentageMultiplier = hevcBitratePercentageMultiplier,
-            .clientRefreshRateX100 = clientRefreshRateX100,
-            .encryptionFlags = encryptionFlags,
+            .packetSize = packet_size,
+            .streamingRemotely = streaming_remotely,
+            .audioConfiguration = audio_configuration,
+            .supportsHevc = supports_hevc,
+            .enableHdr = enable_hdr,
+            .hevcBitratePercentageMultiplier = hevc_bitrate_percentage_multiplier,
+            .clientRefreshRateX100 = client_refresh_rate_x100,
+            .encryptionFlags = encryption_flags,
     };
 
-    jbyte* riAesKeyBuf = (*env)->GetByteArrayElements(env, riAesKey, NULL);
+    jbyte *riAesKeyBuf = (*env)->GetByteArrayElements(env, ri_aes_key, NULL);
     memcpy(streamConfig.remoteInputAesKey, riAesKeyBuf, sizeof(streamConfig.remoteInputAesKey));
-    (*env)->ReleaseByteArrayElements(env, riAesKey, riAesKeyBuf, JNI_ABORT);
+    (*env)->ReleaseByteArrayElements(env, ri_aes_key, riAesKeyBuf, JNI_ABORT);
 
-    jbyte* riAesIvBuf = (*env)->GetByteArrayElements(env, riAesIv, NULL);
+    jbyte *riAesIvBuf = (*env)->GetByteArrayElements(env, ri_aes_iv, NULL);
     memcpy(streamConfig.remoteInputAesIv, riAesIvBuf, sizeof(streamConfig.remoteInputAesIv));
-    (*env)->ReleaseByteArrayElements(env, riAesIv, riAesIvBuf, JNI_ABORT);
+    (*env)->ReleaseByteArrayElements(env, ri_aes_iv, riAesIvBuf, JNI_ABORT);
 
-    BridgeVideoRendererCallbacks.capabilities = videoCapabilities;
+    BridgeVideoRendererCallbacks.capabilities = video_capabilities;
 
     int ret = LiStartConnection(&serverInfo,
                                 &streamConfig,
@@ -427,12 +475,12 @@ Java_com_limelight_nvstream_jni_MoonBridge_startConnection(JNIEnv *env, jclass c
                                 NULL, 0);
 
     (*env)->ReleaseStringUTFChars(env, address, serverInfo.address);
-    (*env)->ReleaseStringUTFChars(env, appVersion, serverInfo.serverInfoAppVersion);
-    if (gfeVersion != NULL) {
-        (*env)->ReleaseStringUTFChars(env, gfeVersion, serverInfo.serverInfoGfeVersion);
+    (*env)->ReleaseStringUTFChars(env, app_version, serverInfo.serverInfoAppVersion);
+    if (gfe_version != NULL) {
+        (*env)->ReleaseStringUTFChars(env, gfe_version, serverInfo.serverInfoGfeVersion);
     }
-    if (rtspSessionUrl != NULL) {
-        (*env)->ReleaseStringUTFChars(env, rtspSessionUrl, serverInfo.rtspSessionUrl);
+    if (rtsp_session_url != NULL) {
+        (*env)->ReleaseStringUTFChars(env, rtsp_session_url, serverInfo.rtspSessionUrl);
     }
 
     return ret;

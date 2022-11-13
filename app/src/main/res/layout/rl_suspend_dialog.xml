@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#00000000"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <com.limelight.ui.view.PickerView
+
+        android:id="@+id/pickView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@id/ll_selection_list"
+        android:layout_marginBottom="-3dp"
+        android:background="@drawable/bg_text"
+        app:isCyclic="false"
+        app:textColor="#FFFFFF"
+        app:itemHeight="33dp"
+        app:textSize="31dp" />
+
+    <LinearLayout
+        android:id="@+id/ll_selection_list"
+        android:layout_width="match_parent"
+        android:layout_height="107dp"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        >
+        <Button
+            android:id="@+id/btn_postive"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_alignParentBottom="true"
+            android:text="确定"
+            android:background="@drawable/bg_round_selected_left_bottom"
+            android:layout_alignParentLeft="true"
+            android:layout_weight="1"
+            android:textColor="#000000"
+            android:textSize="40dp"
+
+            />
+        <Button
+            android:id="@+id/btn_negative"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentRight="true"
+            android:text="取消"
+            android:background="@drawable/bg_round_normal_right_bottom"
+            android:layout_weight="1"
+            android:textColor="#000000"
+            android:textSize="40dp"
+            />
+    </LinearLayout>
+
+</RelativeLayout>

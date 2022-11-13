@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="DragView">
+        <attr name="foregroundImage" format="reference" />
+        <attr name="backgroundColor" format="string" />
+        <attr name="dragWidth" format="dimension" />
+        <attr name="dragHeight" format="dimension" />
+        <attr name="welt" format="boolean" />
+        <attr name="bounce" format="boolean" />
+        <attr name="animationTime" format="integer" />
+        <attr name="marginLeft" format="integer" />
+        <attr name="marginTop" format="integer" />
+        <attr name="marginRight" format="integer" />
+        <attr name="marginBottom" format="integer" />
+    </declare-styleable>
+    <declare-styleable name="HXSControlButton">
+        <attr name="HXSB_message" format="string"/>
+        <attr name="HXSB_src" format="reference|color"/>
+    </declare-styleable>
+    <declare-styleable name="HXSKeyButton">
+        <attr name="src" format="integer"/>
+        <attr name="text" format="string"/>
+        <attr name="imgWidth" format="dimension"/>
+        <attr name="imgHeight" format="dimension"/>
+    </declare-styleable>
+    <attr format="boolean" name="autoFitSize"/>
+    <attr format="boolean" name="curved"/>
+    <attr format="boolean" name="isCyclic"/>
+    <attr format="dimension" name="itemHeight"/>
+    <attr format="integer" name="preferredMaxOffsetItemCount"/>
+    <attr format="color" name="textColor"/>
+    <attr format="dimension" name="textSize"/>
+    <declare-styleable name="DateTimePickerView"><attr format="enum" name="type">
+        <enum name="dateTime" value="0"/>
+        <enum name="dateHourMinute" value="1"/>
+        <enum name="yearMonthDayHourMinute" value="2"/>
+        <enum name="yearMonthDay" value="3"/>
+    </attr><attr format="enum" name="minutesInterval">
+        <enum name="one" value="1"/>
+        <enum name="five" value="5"/>
+        <enum name="ten" value="10"/>
+        <enum name="fifteen" value="15"/>
+        <enum name="twenty" value="20"/>
+        <enum name="thirty" value="30"/>
+    </attr></declare-styleable>
+    <declare-styleable name="DivisionPickerView"><attr format="enum" name="divisionPickerType">
+        <enum name="all" value="0"/>
+        <enum name="provinceAndCity" value="1"/>
+    </attr></declare-styleable>
+    <declare-styleable name="PickerView"><attr name="preferredMaxOffsetItemCount"/><attr name="itemHeight"/><attr name="textSize"/><attr name="textColor"/><attr name="isCyclic"/><attr name="autoFitSize"/><attr name="curved"/></declare-styleable>
+    <declare-styleable name="PickerViewGroup"><attr name="preferredMaxOffsetItemCount"/><attr name="itemHeight"/><attr name="textSize"/><attr name="textColor"/><attr name="autoFitSize"/><attr name="curved"/></declare-styleable>
+    <style name="DialogAnimation" parent="@android:style/Animation.Dialog">
+        <item name="android:windowEnterAnimation">@anim/top_defaults_view_pickerview_slide_in_from_bottom</item>
+        <item name="android:windowExitAnimation">@anim/top_defaults_view_pickerview_slide_out_to_bottom</item>
+    </style>
+</resources>

@@ -10,9 +10,18 @@ import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.FrameLayout;
+import android.view.WindowManager;
+import android.widget.RelativeLayout;
+
+
+import com.limelight.Game;
+import com.limelight.Infrastructure.common.HXSConstant;
+import com.limelight.preferences.HXSControllerPosition;
+import com.limelight.preferences.HXSControllerPositionPreference;
+import com.limelight.ui.dialog.HXSResizeDialog;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -35,23 +44,34 @@ public abstract class VirtualControllerElement extends View {
     public static final int EID_RS = 13;
     public static final int EID_LSB = 14;
     public static final int EID_RSB = 15;
+    public static final int EID_MOUSE_LEFT = 16;
+    public static final int EID_MOUSE_MIDDLE = 17;
+    public static final int EID_MOUSE_RIGHT = 18;
+    public static final int EID_INVISIBLE_TOUCH_PAD = 19;
 
     protected VirtualController virtualController;
     protected final int elementId;
 
     private final Paint paint = new Paint();
 
-    private int normalColor = 0xF0888888;
-    protected int pressedColor = 0xF00000FF;
-    private int configMoveColor = 0xF0FF0000;
-    private int configResizeColor = 0xF0FF00FF;
-    private int configSelectedColor = 0xF000FF00;
+    private int normalColor = 0x00888888;
+    protected int pressedColor = 0x000000FF;
+    private int configMoveColor = 0x00FF0000;
+    private int configResizeColor = 0x00FF00FF;
+    private int configSelectedColor = 0x0000FF00;
 
     protected int startSize_x;
     protected int startSize_y;
 
     float position_pressed_x = 0;
     float position_pressed_y = 0;
+
+    public double width;
+    public double height;
+    protected int index = -1;
+
+    boolean isMoved = false;
+
 
     private enum Mode {
         Normal,
@@ -72,7 +92,7 @@ public abstract class VirtualControllerElement extends View {
         int newPos_x = (int) getX() + x - pressed_x;
         int newPos_y = (int) getY() + y - pressed_y;
 
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) getLayoutParams();
 
         layoutParams.leftMargin = newPos_x > 0 ? newPos_x : 0;
         layoutParams.topMargin = newPos_y > 0 ? newPos_y : 0;
@@ -80,10 +100,67 @@ public abstract class VirtualControllerElement extends View {
         layoutParams.bottomMargin = 0;
 
         requestLayout();
+        HXSControllerPosition position = null;
+        position = getPosition();
+        if (position == null) {
+            return;
+        }
+        DisplayMetrics screen = HXSConstant.App.getResources().getDisplayMetrics();
+        int height = screen.heightPixels;
+        int width = screen.widthPixels;
+        position.width = ((double) layoutParams.leftMargin) / width;
+        position.height = ((double) layoutParams.topMargin) / height;
+    }
+    public static HXSControllerPosition getPosition(int id){
+        switch (id){
+            case VirtualControllerElement.EID_A:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_A);
+            case VirtualControllerElement.EID_B:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_B);
+            case VirtualControllerElement.EID_X:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_X);
+            case VirtualControllerElement.EID_Y:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_Y);
+            case VirtualControllerElement.EID_DPAD:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_PAD);
+            case VirtualControllerElement.EID_BACK:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_BACK);
+            case VirtualControllerElement.EID_START:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_START);
+            case VirtualControllerElement.EID_LB:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_LB);
+            case VirtualControllerElement.EID_LS:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_LS);
+            case VirtualControllerElement.EID_RT:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_RT);
+            case VirtualControllerElement.EID_LT:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_LT);
+            case VirtualControllerElement.EID_RB:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_RB);
+            case VirtualControllerElement.EID_RS:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_RS);
+            case VirtualControllerElement.EID_MOUSE_LEFT:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_MOUSE_LEFT);
+            case VirtualControllerElement.EID_MOUSE_MIDDLE:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_MOUSE_MIDDLE);
+            case VirtualControllerElement.EID_MOUSE_RIGHT:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_MOUSE_RIGHT);
+            case VirtualControllerElement.EID_INVISIBLE_TOUCH_PAD:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_INVISIBLE_PAD);
+            case  VirtualControllerElement.EID_LSB:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_LSB);
+            case VirtualControllerElement.EID_RSB:
+                return HXSControllerPositionPreference.getInstance().positionHashMap.get(HXSControllerPositionPreference.KEY_RSB);
+        }
+        return null;
+    }
+    public HXSControllerPosition getPosition() {
+
+        return getPosition(elementId);
     }
 
     protected void resizeElement(int pressed_x, int pressed_y, int width, int height) {
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) getLayoutParams();
 
         int newHeight = height + (startSize_y - pressed_y);
         int newWidth = width + (startSize_x - pressed_x);
@@ -104,7 +181,7 @@ public abstract class VirtualControllerElement extends View {
             paint.setStyle(Paint.Style.STROKE);
 
             canvas.drawRect(paint.getStrokeWidth(), paint.getStrokeWidth(),
-                    getWidth()-paint.getStrokeWidth(), getHeight()-paint.getStrokeWidth(),
+                    getWidth() - paint.getStrokeWidth(), getHeight() - paint.getStrokeWidth(),
                     paint);
         }
 
@@ -142,6 +219,7 @@ public abstract class VirtualControllerElement extends View {
         colorDialog.show();
     }
     */
+    abstract void setAlpha(int alpha);
 
     protected void actionEnableMove() {
         currentMode = Mode.Move;
@@ -167,7 +245,7 @@ public abstract class VirtualControllerElement extends View {
 
     protected int getDefaultStrokeWidth() {
         DisplayMetrics screen = getResources().getDisplayMetrics();
-        return (int)(screen.heightPixels*0.004f);
+        return (int) (screen.heightPixels * 0.004f);
     }
 
     protected void showConfigurationDialog() {
@@ -178,11 +256,11 @@ public abstract class VirtualControllerElement extends View {
         CharSequence functions[] = new CharSequence[]{
                 "Move",
                 "Resize",
-            /*election
-            "Set n
-            Disable color sormal color",
-            "Set pressed color",
-            */
+                /*election
+                "Set n
+                Disable color sormal color",
+                "Set pressed color",
+                */
                 "Cancel"
         };
 
@@ -223,21 +301,19 @@ public abstract class VirtualControllerElement extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        // Ignore secondary touches on controls
-        //
-        // NB: We can get an additional pointer down if the user touches a non-StreamView area
-        // while also touching an OSC control, even if that pointer down doesn't correspond to
-        // an area of the OSC control.
-        if (event.getActionIndex() != 0) {
+        if (virtualController.getControllerMode() == VirtualController.ControllerMode.Active) {
+
+            return onElementTouchEvent(event);
+        }
+        if(elementId == EID_INVISIBLE_TOUCH_PAD){
+            //            透明触摸板不接受自定义  拦截事件分发
             return true;
         }
 
-        if (virtualController.getControllerMode() == VirtualController.ControllerMode.Active) {
-            return onElementTouchEvent(event);
-        }
-
         switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN: {
+            case MotionEvent.ACTION_DOWN:
+                index = event.getActionIndex();
+            case MotionEvent.ACTION_POINTER_DOWN: {
                 position_pressed_x = event.getX();
                 position_pressed_y = event.getY();
                 startSize_x = getWidth();
@@ -251,8 +327,13 @@ public abstract class VirtualControllerElement extends View {
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
+
                 switch (currentMode) {
                     case Move: {
+                        if (Math.abs(position_pressed_x - event.getX()) < 7 && Math.abs(position_pressed_y - event.getY()) < 7) {
+                            break;
+                        }
+                        isMoved = true;
                         moveElement(
                                 (int) position_pressed_x,
                                 (int) position_pressed_y,
@@ -261,11 +342,11 @@ public abstract class VirtualControllerElement extends View {
                         break;
                     }
                     case Resize: {
-                        resizeElement(
-                                (int) position_pressed_x,
-                                (int) position_pressed_y,
-                                (int) event.getX(),
-                                (int) event.getY());
+                        //                        resizeElement(
+                        //                                (int) position_pressed_x,
+                        //                                (int) position_pressed_y,
+                        //                                (int) event.getX(),
+                        //                                (int) event.getY());
                         break;
                     }
                     case Normal: {
@@ -275,7 +356,27 @@ public abstract class VirtualControllerElement extends View {
                 return true;
             }
             case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP: {
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP:
+
+                if (index != event.getActionIndex()){
+                    return false;
+                }
+            {
+                if (currentMode == Mode.Move) {
+                    if (!isMoved) {
+                        HXSResizeDialog dialog = new HXSResizeDialog(Game.getInstance(), this);
+                        dialog.show();
+                        WindowManager windowManager = Game.getInstance().getWindowManager();
+                        Display display = windowManager.getDefaultDisplay();
+                        WindowManager.LayoutParams lp = dialog.getWindow().getAttributes();
+                        lp.width = (int) (display.getWidth() * 0.65);
+                        lp.height = (int) (display.getHeight() * 0.9);
+                        dialog.getWindow().setAttributes(lp);
+                        dialog.setCancelable(false);
+                    }
+                    isMoved = false;
+                }
                 actionCancel();
                 return true;
             }
@@ -323,24 +424,28 @@ public abstract class VirtualControllerElement extends View {
     public JSONObject getConfiguration() throws JSONException {
         JSONObject configuration = new JSONObject();
 
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) getLayoutParams();
 
         configuration.put("LEFT", layoutParams.leftMargin);
         configuration.put("TOP", layoutParams.topMargin);
-        configuration.put("WIDTH", layoutParams.width);
-        configuration.put("HEIGHT", layoutParams.height);
 
         return configuration;
     }
 
-    public void loadConfiguration(JSONObject configuration) throws JSONException {
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
-
-        layoutParams.leftMargin = configuration.getInt("LEFT");
-        layoutParams.topMargin = configuration.getInt("TOP");
-        layoutParams.width = configuration.getInt("WIDTH");
-        layoutParams.height = configuration.getInt("HEIGHT");
-
+    public void loadConfiguration(HXSControllerPosition configuration) {
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) getLayoutParams();
+        DisplayMetrics screen = HXSConstant.App.getResources().getDisplayMetrics();
+        int height = screen.heightPixels;
+        int width = screen.widthPixels;
+        layoutParams.leftMargin = (int) (configuration.width * width);
+        layoutParams.topMargin = (int) (configuration.height * height);
+        layoutParams.height = (int) (configuration.size * this.height);
+        layoutParams.width = (int) (configuration.size * this.width);
         requestLayout();
+        if (configuration.visitable) {
+            this.setVisibility(VISIBLE);
+        } else {
+            this.setVisibility(GONE);
+        }
     }
 }

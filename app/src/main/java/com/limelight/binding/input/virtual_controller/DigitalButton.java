@@ -44,6 +44,7 @@ public class DigitalButton extends VirtualControllerElement {
     private List<DigitalButtonListener> listeners = new ArrayList<>();
     private String text = "";
     private int icon = -1;
+    private int alpha = 255;
     private long timerLongClickTimeout = 3000;
     private final Runnable longClickRunnable = new Runnable() {
         @Override
@@ -134,6 +135,12 @@ public class DigitalButton extends VirtualControllerElement {
     }
 
     @Override
+    void setAlpha(int alpha) {
+        this.alpha = alpha;
+        invalidate();
+    }
+
+    @Override
     protected void onElementDraw(Canvas canvas) {
         // set transparent background
         canvas.drawColor(Color.TRANSPARENT);
@@ -154,10 +161,11 @@ public class DigitalButton extends VirtualControllerElement {
         if (icon != -1) {
             Drawable d = getResources().getDrawable(icon);
             d.setBounds(5, 5, getWidth() - 5, getHeight() - 5);
+            d.setAlpha(alpha);
             d.draw(canvas);
         } else {
             paint.setStyle(Paint.Style.FILL_AND_STROKE);
-            paint.setStrokeWidth(getDefaultStrokeWidth()/2);
+            paint.setStrokeWidth(getDefaultStrokeWidth() / 2);
             canvas.drawText(text, getPercent(getWidth(), 50), getPercent(getHeight(), 63), paint);
         }
     }
@@ -225,6 +233,7 @@ public class DigitalButton extends VirtualControllerElement {
 
                 return true;
             }
+            case MotionEvent.ACTION_POINTER_UP:
             default: {
             }
         }

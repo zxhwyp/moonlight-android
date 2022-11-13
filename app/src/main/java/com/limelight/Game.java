@@ -1,6 +1,10 @@
 package com.limelight;
 
 
+import com.bumptech.glide.Glide;
+import com.limelight.Infrastructure.httpUtils.HXSHttpRequestCenter;
+import com.limelight.UserData.HXSUserModule;
+import com.limelight.UserData.HXSVmData;
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.audio.AndroidAudioRenderer;
 import com.limelight.binding.input.ControllerHandler;
@@ -13,10 +17,13 @@ import com.limelight.binding.input.driver.UsbDriverService;
 import com.limelight.binding.input.evdev.EvdevListener;
 import com.limelight.binding.input.touch.TouchContext;
 import com.limelight.binding.input.virtual_controller.VirtualController;
+import com.limelight.binding.input.virtual_controller.VirtualControllerConfigurationLoader;
+import com.limelight.binding.input.virtual_controller.VirtualControllerElement;
 import com.limelight.binding.video.CrashListener;
 import com.limelight.binding.video.MediaCodecDecoderRenderer;
 import com.limelight.binding.video.MediaCodecHelper;
 import com.limelight.binding.video.PerfOverlayListener;
+import com.limelight.controller.HXStreamDelegate;
 import com.limelight.nvstream.NvConnection;
 import com.limelight.nvstream.NvConnectionListener;
 import com.limelight.nvstream.StreamConfiguration;
@@ -24,11 +31,25 @@ import com.limelight.nvstream.http.ComputerDetails;
 import com.limelight.nvstream.http.NvApp;
 import com.limelight.nvstream.input.KeyboardPacket;
 import com.limelight.nvstream.input.MouseButtonPacket;
+import com.limelight.binding.input.touch.NoTouchContext;
 import com.limelight.nvstream.jni.MoonBridge;
+import com.hxstream.operation.HXSConnection;
 import com.limelight.preferences.GlPreferences;
+import com.limelight.preferences.HXSControllerPositionPreference;
+import com.limelight.preferences.HXStreamViewPreference;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.ui.GameGestures;
 import com.limelight.ui.StreamView;
+import com.limelight.ui.dialog.HXSAlterDialog;
+import com.limelight.ui.dialog.HXSSuspendDialog;
+import com.limelight.ui.dialog.HXSVMSettingDialog;
+import com.limelight.ui.view.HXSControlTab;
+import com.limelight.ui.view.HXSDragView;
+import com.limelight.ui.view.HXSKeyboard;
+import com.limelight.ui.view.HXSKeyboardNum;
+import com.limelight.ui.view.HXSMoveTopTab;
+import com.limelight.ui.view.HXSTabbar;
+import com.limelight.ui.view.HXSToast;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.NetHelper;
 import com.limelight.utils.ServerHelper;
@@ -59,6 +80,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.util.AttributeSet;
 import android.util.Rational;
 import android.view.Display;
 import android.view.InputDevice;
@@ -70,12 +92,20 @@ import android.view.View;
 import android.view.View.OnGenericMotionListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
 import android.view.View.OnTouchListener;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
@@ -85,19 +115,70 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Locale;
 
+import me.jessyan.autosize.AutoSize;
+import me.jessyan.autosize.internal.CustomAdapt;
+
+import static java.lang.Thread.sleep;
+
 
 public class Game extends Activity implements SurfaceHolder.Callback,
         OnGenericMotionListener, OnTouchListener, NvConnectionListener, EvdevListener,
         OnSystemUiVisibilityChangeListener, GameGestures, StreamView.InputCallbacks,
-        PerfOverlayListener, UsbDriverService.UsbDriverStateListener, View.OnKeyListener {
+        PerfOverlayListener, UsbDriverService.UsbDriverStateListener, View.OnKeyListener, HXSTabbar.IDragViewClicked, CustomAdapt {
     private int lastButtonState = 0;
 
+    private static boolean isTabBarShow = false;
+    private ImageView ivImageCover;
+    private TextView tvDelayOverlay;
+    private static Boolean isGameRunning = false;
+
+    private int touchType = 0;
+
     // Only 2 touches are supported
-    private final TouchContext[] touchContextMap = new TouchContext[2];
+    public final TouchContext[] touchContextMap = new TouchContext[2];
     private long threeFingerDownTime = 0;
 
-    private static final int REFERENCE_HORIZ_RES = 1280;
-    private static final int REFERENCE_VERT_RES = 720;
+    public static final int REFERENCE_HORIZ_RES = 1280;
+    public static final int REFERENCE_VERT_RES = 720;
+
+    public static final int TOUCH_TYPE_ABSOLUTE = 1;
+    public static final int TOUCH_TYPE_RELATIVE = 0;
+    public static final int TOUCH_TYPE_NON = 2;
+
+    public HXSVMSettingDialog dialog;
+    HXSMoveTopTab tab;
+
+
+    private Handler handler = new Handler();
+    private boolean isBackPressed = false;
+    public static boolean isKeyboardShown = false;
+    private HXSDragView dragView;
+    private Thread dragViewDelayThread;
+    private HXSTabbar tabBar;
+    private HXSControlTab controlTab;
+    public int alpha = 50;
+    public int scrollerSpeed = 10;
+    private static Game instance = null;
+    public boolean controllerVisible = true;
+    public boolean isMicPhoneOn = false;
+    public boolean useSourceKeyboard = false;
+    public boolean isTouchPadOpen = false;
+    public boolean mouseShow = true;
+    public boolean disableTouch = false;
+    private Configuration newConfig;
+    InputMethodManager imm;
+    HXSAlterDialog alterDialog;
+
+    public static NvConnection connection;
+    private static HXSKeyboardNum keyboardNum;
+    private static HXSKeyboard keyboard;
+
+    public static Game getInstance() {
+        return instance;
+    }
+
+    private TextView tvVmMessage;
+    private HXSVmData.IVmMessageListener listener;
 
     private static final int STYLUS_DOWN_DEAD_ZONE_DELAY = 100;
     private static final int STYLUS_DOWN_DEAD_ZONE_RADIUS = 20;
@@ -109,12 +190,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     private ControllerHandler controllerHandler;
     private KeyboardTranslator keyboardTranslator;
-    private VirtualController virtualController;
+    public VirtualController virtualController;
 
     private PreferenceConfiguration prefConfig;
     private SharedPreferences tombstonePrefs;
 
-    private NvConnection conn;
+    public NvConnection conn;
     private SpinnerDialog spinner;
     private boolean displayedFailureDialog = false;
     private boolean connecting = false;
@@ -179,6 +260,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        instance = this;
+
         UiHelper.setLocale(this);
 
         // We don't want a title bar
@@ -192,8 +275,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             getWindow().getDecorView().setSystemUiVisibility(
                     View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
 
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
         }
@@ -211,6 +294,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         spinner = SpinnerDialog.displayDialog(this, getResources().getString(R.string.conn_establishing_title),
                 getResources().getString(R.string.conn_establishing_msg), true);
 
+        spinner.dismiss();
+        keyboardNum = findViewById(R.id.keyboard_num);
+        keyboard = findViewById(R.id.keyboard_abc);
+        isKeyboardShown = false;
+        controlTab = findViewById(R.id.tab_control);
+        controlTab.setListener(this);
+        imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        touchType = HXStreamViewPreference.getTouchType();
+
+
         // Read the stream preferences
         prefConfig = PreferenceConfiguration.readPreferences(this);
         tombstonePrefs = Game.this.getSharedPreferences("DecoderTombstone", 0);
@@ -224,8 +317,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 getWindow().getAttributes().layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-            }
-            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 getWindow().getAttributes().layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             }
@@ -233,9 +325,36 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Listen for non-touch events on the game surface
         streamView = findViewById(R.id.surfaceView);
+        tvDelayOverlay = findViewById(R.id.tv_delay_overlay);
         streamView.setOnGenericMotionListener(this);
         streamView.setOnKeyListener(this);
         streamView.setInputCallbacks(this);
+
+        tvVmMessage = findViewById(R.id.vmMessageOverlay);
+        listener = new HXSVmData.IVmMessageListener() {
+            @Override
+            public void onReceivedMessage(final String message) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        tvVmMessage.setText(message);
+                        tvVmMessage.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+
+            @Override
+            public void onMessageDismiss() {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        tvVmMessage.setText("");
+                        tvVmMessage.setVisibility(View.GONE);
+                    }
+                });
+            }
+        };
+        HXSVmData.observers.add(listener);
 
         // Listen for touch events on the background touch view to enable trackpad mode
         // to work on areas outside of the StreamView itself. We use a separate View
@@ -251,17 +370,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // artificially increasing input latency while streaming.
             streamView.requestUnbufferedDispatch(
                     InputDevice.SOURCE_CLASS_BUTTON | // Keyboards
-                    InputDevice.SOURCE_CLASS_JOYSTICK | // Gamepads
-                    InputDevice.SOURCE_CLASS_POINTER | // Touchscreens and mice (w/o pointer capture)
-                    InputDevice.SOURCE_CLASS_POSITION | // Touchpads
-                    InputDevice.SOURCE_CLASS_TRACKBALL // Mice (pointer capture)
+                            InputDevice.SOURCE_CLASS_JOYSTICK | // Gamepads
+                            InputDevice.SOURCE_CLASS_POINTER | // Touchscreens and mice (w/o pointer capture)
+                            InputDevice.SOURCE_CLASS_POSITION | // Touchpads
+                            InputDevice.SOURCE_CLASS_TRACKBALL // Mice (pointer capture)
             );
             backgroundTouchView.requestUnbufferedDispatch(
                     InputDevice.SOURCE_CLASS_BUTTON | // Keyboards
-                    InputDevice.SOURCE_CLASS_JOYSTICK | // Gamepads
-                    InputDevice.SOURCE_CLASS_POINTER | // Touchscreens and mice (w/o pointer capture)
-                    InputDevice.SOURCE_CLASS_POSITION | // Touchpads
-                    InputDevice.SOURCE_CLASS_TRACKBALL // Mice (pointer capture)
+                            InputDevice.SOURCE_CLASS_JOYSTICK | // Gamepads
+                            InputDevice.SOURCE_CLASS_POINTER | // Touchscreens and mice (w/o pointer capture)
+                            InputDevice.SOURCE_CLASS_POSITION | // Touchpads
+                            InputDevice.SOURCE_CLASS_TRACKBALL // Mice (pointer capture)
             );
 
             // Since the OS isn't going to batch for us, we have to batch mouse events to
@@ -369,11 +488,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 if (!willStreamHdr) {
                     // Nope, no HDR for us :(
-                    Toast.makeText(this, "Display does not support HDR10", Toast.LENGTH_LONG).show();
+                    HXSLog.info("Toast.makeText(this, \"This game does not support HDR10\", Toast.LENGTH_SHORT).show();");
                 }
-            }
-            else {
-                Toast.makeText(this, "HDR requires Android 7.0 or later", Toast.LENGTH_LONG).show();
             }
         }
 
@@ -405,12 +521,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // Don't stream HDR if the decoder can't support it
         if (willStreamHdr && !decoderRenderer.isHevcMain10Hdr10Supported()) {
             willStreamHdr = false;
-            Toast.makeText(this, "Decoder does not support HEVC Main10HDR10", Toast.LENGTH_LONG).show();
+            HXSLog.info("HDRSupport:" + false);
         }
 
         // Display a message to the user if HEVC was forced on but we still didn't find a decoder
         if (prefConfig.videoFormat == PreferenceConfiguration.FORCE_H265_ON && !decoderRenderer.isHevcSupported()) {
-            Toast.makeText(this, "No HEVC decoder found.\nFalling back to H.264.", Toast.LENGTH_LONG).show();
+            HXSLog.info("Toast.makeText(this, \"No H.265 decoder found.\\nFalling back to H.264.\", Toast.LENGTH_LONG).show();");
         }
 
         int gamepadMask = ControllerHandler.getAttachedControllerMask(this);
@@ -427,7 +543,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Set to the optimal mode for streaming
         float displayRefreshRate = prepareDisplayForRendering();
-        LimeLog.info("Display refresh rate: "+displayRefreshRate);
+        LimeLog.info("Display refresh rate: " + displayRefreshRate);
 
         // If the user requested frame pacing using a capped FPS, we will need to change our
         // desired FPS setting here in accordance with the active display refresh rate.
@@ -443,8 +559,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     // Let's avoid clearly bogus refresh rates and fall back to legacy rendering
                     prefConfig.framePacing = PreferenceConfiguration.FRAME_PACING_BALANCED;
                     LimeLog.info("Bogus refresh rate: " + roundedRefreshRate);
-                }
-                else {
+                } else {
                     chosenFrameRate = roundedRefreshRate - 1;
                     LimeLog.info("Adjusting FPS target for screen to " + chosenFrameRate);
                 }
@@ -472,7 +587,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 .setHevcSupported(decoderRenderer.isHevcSupported())
                 .setEnableHdr(willStreamHdr)
                 .setAttachedGamepadMask(gamepadMask)
-                .setClientRefreshRateX100((int)(displayRefreshRate * 100))
+                .setClientRefreshRateX100((int) (displayRefreshRate * 100))
                 .setAudioConfiguration(prefConfig.audioConfiguration)
                 .setAudioEncryption(true)
                 .build();
@@ -482,6 +597,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         controllerHandler = new ControllerHandler(this, conn, this, prefConfig);
         keyboardTranslator = new KeyboardTranslator();
 
+        connection = conn;
+        initializeTouchContexts(touchType);
+
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(controllerHandler, null);
         inputManager.registerInputDeviceListener(keyboardTranslator, null);
@@ -490,8 +608,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         for (int i = 0; i < touchContextMap.length; i++) {
             if (!prefConfig.touchscreenTrackpad) {
                 touchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
-            }
-            else {
+            } else {
                 touchContextMap[i] = new RelativeTouchContext(conn, i,
                         REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
                         streamView, prefConfig);
@@ -507,10 +624,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (prefConfig.onscreenController) {
             // create virtual onscreen controller
             virtualController = new VirtualController(controllerHandler,
-                    (FrameLayout)streamView.getParent(),
+                    (FrameLayout) streamView.getParent(),
                     this);
             virtualController.refreshLayout();
             virtualController.show();
+
+            alpha = HXStreamViewPreference.getSeekAlpha();
+            scrollerSpeed = HXStreamViewPreference.getSeekSpeed();
+            controllerVisible = HXStreamViewPreference.getSwitchControllerVisible();
+            mouseShow = HXStreamViewPreference.getMouseVisible();
+            useSourceKeyboard = HXStreamViewPreference.getUseSourceKeyboard();
+            isTouchPadOpen = HXStreamViewPreference.getTouchPadOpen();
+            virtualController.setAlpha(alpha * 255 / 50);
+            if (!controllerVisible) {
+                virtualController.hide();
+            }
         }
 
         if (prefConfig.usbDriver) {
@@ -533,7 +661,28 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // The connection will be started when the surface gets created
         streamView.getHolder().addCallback(this);
+        ivImageCover = findViewById(R.id.iv_image_cover);
+        try {
+            Glide.with(Game.this)
+                    .load("https://haixingcloud.oss-cn-beijing.aliyuncs.com/static/web_static/images/app/start.jpeg")
+                    .placeholder(getResources().getDrawable(R.mipmap.ic_start))//显示加载中的图片
+                    .skipMemoryCache(false)//禁止内存缓存(true) 使用缓存（false）
+                    .fallback(getResources().getDrawable(R.mipmap.ic_start))
+                    .error(getResources().getDrawable(R.mipmap.ic_start))//显示错误图片
+                    //// .override(DensityUtil.px2dip(mContext,192), DensityUtil.px2dip(mContext,144))
+                    .into(ivImageCover);
+        } catch (OutOfMemoryError e) {
+            e.printStackTrace();
+        }
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateStreamRunning);
+                HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateStreamRunning);
+            }
+        });
     }
+
 
     private void setPreferredOrientationForCurrentDisplay() {
         Display display = getWindowManager().getDefaultDisplay();
@@ -551,8 +700,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             if (PreferenceConfiguration.isNativeResolution(prefConfig.width, prefConfig.height)) {
                 if (prefConfig.width > prefConfig.height) {
                     desiredOrientation = Configuration.ORIENTATION_LANDSCAPE;
-                }
-                else {
+                } else {
                     desiredOrientation = Configuration.ORIENTATION_PORTRAIT;
                 }
             }
@@ -560,35 +708,28 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             if (desiredOrientation == Configuration.ORIENTATION_LANDSCAPE) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE);
-                }
-                else {
+                } else {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                 }
-            }
-            else if (desiredOrientation == Configuration.ORIENTATION_PORTRAIT) {
+            } else if (desiredOrientation == Configuration.ORIENTATION_PORTRAIT) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
-                }
-                else {
+                } else {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
                 }
-            }
-            else {
+            } else {
                 // If we don't have a reason to lock to portrait or landscape, allow any orientation
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
-                }
-                else {
+                } else {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
                 }
             }
-        }
-        else {
+        } else {
             // For regular displays, we always request landscape
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE);
-            }
-            else {
+            } else {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
         }
@@ -620,8 +761,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 // Update GameManager state to indicate we're in PiP (still gaming, but interruptible)
                 UiHelper.notifyStreamEnteringPiP(this);
-            }
-            else {
+            } else {
                 isHidingOverlays = false;
 
                 // Restore overlays to previous state when leaving PiP
@@ -662,8 +802,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if (pcName != null) {
                     builder.setSubtitle(pcName);
                 }
-            }
-            else if (pcName != null) {
+            } else if (pcName != null) {
                 builder.setTitle(pcName);
             }
         }
@@ -680,8 +819,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             setPictureInPictureParams(getPictureInPictureParams(autoEnter));
-        }
-        else {
+        } else {
             autoEnterPip = autoEnter;
         }
     }
@@ -700,8 +838,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 parameterTypes[1] = boolean.class;
                 Method requestMetaKeyEventMethod = semWindowManager.getDeclaredMethod("requestMetaKeyEvent", parameterTypes);
                 requestMetaKeyEventMethod.invoke(manager, this.getComponentName(), enabled);
-            }
-            else {
+            } else {
                 LimeLog.warning("SemWindowManager.getInstance() returned null");
             }
         } catch (ClassNotFoundException e) {
@@ -813,8 +950,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 boolean resolutionFitsStream = candidate.getPhysicalWidth() >= prefConfig.width &&
                         candidate.getPhysicalHeight() >= prefConfig.height;
 
-                LimeLog.info("Examining display mode: "+candidate.getPhysicalWidth()+"x"+
-                        candidate.getPhysicalHeight()+"x"+candidate.getRefreshRate());
+                HXSLog.info("Examining display mode: " + candidate.getPhysicalWidth() + "x" +
+                        candidate.getPhysicalHeight() + "x" + candidate.getRefreshRate());
 
                 if (candidate.getPhysicalWidth() > 4096 && prefConfig.width <= 4096) {
                     // Avoid resolutions options above 4K to be safe
@@ -842,8 +979,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     // mode, we want to always prefer the highest frame rate even though it may cause
                     // microstuttering.
                     continue;
-                }
-                else if (refreshRateIsGood) {
+                } else if (refreshRateIsGood) {
                     // We've already got a good match, so if this one isn't also good, it's not
                     // worth considering at all.
                     if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
@@ -856,16 +992,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         if (candidate.getRefreshRate() > bestMode.getRefreshRate()) {
                             continue;
                         }
-                    }
-                    else {
+                    } else {
                         // User asked for the highest possible refresh rate, so don't reduce it if we
                         // have a good match already
                         if (refreshRateReduced) {
                             continue;
                         }
                     }
-                }
-                else if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
+                } else if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
                     // We didn't have a good match and this match isn't good either, so just don't
                     // reduce the refresh rate.
                     if (refreshRateReduced) {
@@ -882,8 +1016,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 refreshRateIsGood = isRefreshRateGoodMatch(candidate.getRefreshRate());
                 refreshRateIsEqual = isRefreshRateEqualMatch(candidate.getRefreshRate());
             }
-            LimeLog.info("Selected display mode: "+bestMode.getPhysicalWidth()+"x"+
-                    bestMode.getPhysicalHeight()+"x"+bestMode.getRefreshRate());
+            HXSLog.info("Selected display mode: " + bestMode.getPhysicalWidth() + "x" +
+                    bestMode.getPhysicalHeight() + "x" + bestMode.getRefreshRate());
             windowLayoutParams.preferredDisplayModeId = bestMode.getModeId();
             displayRefreshRate = bestMode.getRefreshRate();
         }
@@ -891,7 +1025,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             float bestRefreshRate = display.getRefreshRate();
             for (float candidate : display.getSupportedRefreshRates()) {
-                LimeLog.info("Examining refresh rate: "+candidate);
+                HXSLog.info("Examining refresh rate: " + candidate);
 
                 if (candidate > bestRefreshRate) {
                     // Ensure the frame rate stays around 60 Hz for <= 60 FPS streams
@@ -904,11 +1038,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     bestRefreshRate = candidate;
                 }
             }
-            LimeLog.info("Selected refresh rate: "+bestRefreshRate);
+            LimeLog.info("Selected refresh rate: " + bestRefreshRate);
             windowLayoutParams.preferredRefreshRate = bestRefreshRate;
             displayRefreshRate = bestRefreshRate;
-        }
-        else {
+        } else {
             // Otherwise, the active display refresh rate is just
             // whatever is currently in use.
             displayRefreshRate = display.getRefreshRate();
@@ -936,8 +1069,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             Point screenSize = new Point(0, 0);
             display.getSize(screenSize);
 
-            double screenAspectRatio = ((double)screenSize.y) / screenSize.x;
-            double streamAspectRatio = ((double)prefConfig.height) / prefConfig.width;
+            double screenAspectRatio = ((double) screenSize.y) / screenSize.x;
+            double streamAspectRatio = ((double) prefConfig.height) / prefConfig.width;
             if (Math.abs(screenAspectRatio - streamAspectRatio) < 0.001) {
                 LimeLog.info("Stream has compatible aspect ratio with output display");
                 aspectRatioMatch = true;
@@ -947,10 +1080,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (prefConfig.stretchVideo || aspectRatioMatch) {
             // Set the surface to the size of the video
             streamView.getHolder().setFixedSize(prefConfig.width, prefConfig.height);
-        }
-        else {
+        } else {
             // Set the surface to scale based on the aspect ratio of the stream
-            streamView.setDesiredAspectRatio((double)prefConfig.width / (double)prefConfig.height);
+            streamView.setDesiredAspectRatio((double) prefConfig.width / (double) prefConfig.height);
         }
 
         if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEVISION) ||
@@ -959,8 +1091,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // it will be eventually activated.
             // TODO: Improve this
             return displayRefreshRate;
-        }
-        else {
+        } else {
             // Use the lower of the current refresh rate and the selected refresh rate.
             // The preferred refresh rate may not actually be applied (ex: Battery Saver mode).
             return Math.min(getWindowManager().getDefaultDisplay().getRefreshRate(), displayRefreshRate);
@@ -969,33 +1100,32 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @SuppressLint("InlinedApi")
     private final Runnable hideSystemUi = new Runnable() {
-            @Override
-            public void run() {
-                // TODO: Do we want to use WindowInsetsController here on R+ instead of
-                // SYSTEM_UI_FLAG_IMMERSIVE_STICKY? They seem to do the same thing as of S...
+        @Override
+        public void run() {
+            // TODO: Do we want to use WindowInsetsController here on R+ instead of
+            // SYSTEM_UI_FLAG_IMMERSIVE_STICKY? They seem to do the same thing as of S...
 
-                // In multi-window mode on N+, we need to drop our layout flags or we'll
-                // be drawing underneath the system UI.
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode()) {
-                    Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                            View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-                }
-                // Use immersive mode on 4.4+ or standard low profile on previous builds
-                else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                            View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                            View.SYSTEM_UI_FLAG_FULLSCREEN |
-                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-                }
-                else {
-                    Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                            View.SYSTEM_UI_FLAG_FULLSCREEN |
-                            View.SYSTEM_UI_FLAG_LOW_PROFILE);
-                }
+            // In multi-window mode on N+, we need to drop our layout flags or we'll
+            // be drawing underneath the system UI.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode()) {
+                Game.this.getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
             }
+            // Use immersive mode on 4.4+ or standard low profile on previous builds
+            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                Game.this.getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                                View.SYSTEM_UI_FLAG_FULLSCREEN |
+                                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            } else {
+                Game.this.getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_FULLSCREEN |
+                                View.SYSTEM_UI_FLAG_LOW_PROFILE);
+            }
+        }
     };
 
     private void hideSystemUi(int delay) {
@@ -1021,8 +1151,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // Disable performance optimizations for foreground
             getWindow().setSustainedPerformanceMode(false);
             decoderRenderer.notifyVideoBackground();
-        }
-        else {
+        } else {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
             // Enable performance optimizations for foreground
@@ -1037,6 +1166,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        instance = null;
+        //        AudioRecordUtil.getInstance().stop();
+        HXSVmData.observers.remove(listener);
+        keyboardNum = null;
+        keyboard = null;
 
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         if (controllerHandler != null) {
@@ -1060,11 +1195,23 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Destroy the capture provider
         inputCaptureProvider.destroy();
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (HXSVmData.connectionStatus == HXSConnection.ConnectionStatus.StateStreamRunning) {
+                    HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateStreamDismiss);
+                    HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateStreamDismiss);
+                }
+            }
+        });
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+
+        isGameRunning = false;
 
         SpinnerDialog.closeDialogs(this);
         Dialog.closeDialogs();
@@ -1084,30 +1231,27 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 int averageDecoderLat = decoderRenderer.getAverageDecoderLatency();
                 String message = null;
                 if (averageEndToEndLat > 0) {
-                    message = getResources().getString(R.string.conn_client_latency)+" "+averageEndToEndLat+" ms";
+                    message = getResources().getString(R.string.conn_client_latency) + " " + averageEndToEndLat + " ms";
                     if (averageDecoderLat > 0) {
-                        message += " ("+getResources().getString(R.string.conn_client_latency_hw)+" "+averageDecoderLat+" ms)";
+                        message += " (" + getResources().getString(R.string.conn_client_latency_hw) + " " + averageDecoderLat + " ms)";
                     }
-                }
-                else if (averageDecoderLat > 0) {
-                    message = getResources().getString(R.string.conn_hardware_latency)+" "+averageDecoderLat+" ms";
+                } else if (averageDecoderLat > 0) {
+                    message = getResources().getString(R.string.conn_hardware_latency) + " " + averageDecoderLat + " ms";
                 }
 
                 // Add the video codec to the post-stream toast
                 if (message != null) {
                     if (videoFormat == MoonBridge.VIDEO_FORMAT_H265_MAIN10) {
                         message += " [HEVC HDR]";
-                    }
-                    else if (videoFormat == MoonBridge.VIDEO_FORMAT_H265) {
+                    } else if (videoFormat == MoonBridge.VIDEO_FORMAT_H265) {
                         message += " [HEVC]";
-                    }
-                    else if (videoFormat == MoonBridge.VIDEO_FORMAT_H264) {
+                    } else if (videoFormat == MoonBridge.VIDEO_FORMAT_H264) {
                         message += " [H.264]";
                     }
                 }
 
                 if (message != null) {
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    // Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 }
             }
 
@@ -1120,6 +1264,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
 
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                HXSConnection.getInstance().getCallback().onStreamActivityDissappear();
+            }
+        });
+
         finish();
     }
 
@@ -1128,8 +1279,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         public void run() {
             if (grabbedInput) {
                 inputCaptureProvider.disableCapture();
-            }
-            else {
+            } else {
                 inputCaptureProvider.enableCapture();
             }
 
@@ -1142,36 +1292,31 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         int modifierMask = 0;
 
         if (androidKeyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
-            androidKeyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+                androidKeyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
             modifierMask = KeyboardPacket.MODIFIER_CTRL;
-        }
-        else if (androidKeyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
-                 androidKeyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+        } else if (androidKeyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
             modifierMask = KeyboardPacket.MODIFIER_SHIFT;
-        }
-        else if (androidKeyCode == KeyEvent.KEYCODE_ALT_LEFT ||
-                 androidKeyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
+        } else if (androidKeyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
             modifierMask = KeyboardPacket.MODIFIER_ALT;
         }
 
         if (down) {
             this.modifierFlags |= modifierMask;
-        }
-        else {
+        } else {
             this.modifierFlags &= ~modifierMask;
         }
 
         // Check if Ctrl+Shift+Z is pressed
         if (androidKeyCode == KeyEvent.KEYCODE_Z &&
-            (modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT)) ==
-                (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT))
-        {
+                (modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT)) ==
+                        (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT)) {
             if (down) {
                 // Now that we've pressed the magic combo
                 // we'll wait for one of the keys to come up
                 grabComboDown = true;
-            }
-            else {
+            } else {
                 // Toggle the grab if Z comes up
                 Handler h = getWindow().getDecorView().getHandler();
                 if (h != null) {
@@ -1269,6 +1414,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 return false;
             }
 
+            if (handleSpecialKeys_WIN_D(event.getKeyCode(), true)) {
+                return true;
+            }
+            if (handleSpecialKeys_WIN_Q(event.getKeyCode(), true)) {
+                return true;
+            }
+
             // Let this method take duplicate key down events
             if (handleSpecialKeys(event.getKeyCode(), true)) {
                 return true;
@@ -1330,6 +1482,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // Always try the controller handler first, unless it's an alphanumeric keyboard device.
             // Otherwise, controller handler will eat keyboard d-pad events.
             handled = controllerHandler.handleButtonUp(event);
+
+            boolean isComboDone = controllerHandler.isStartKeyupCombo(event);
+            if (isComboDone) {
+                HXSHttpRequestCenter.requestSendKey("win-d", null);
+            }
+            if (controllerHandler.isRbLbUpCombo(event)) {
+                super.onBackPressed();
+            }
         }
 
         if (!handled) {
@@ -1337,6 +1497,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             short translated = keyboardTranslator.translate(event.getKeyCode(), event.getDeviceId());
             if (translated == 0) {
                 return false;
+            }
+
+            if (handleSpecialKeys_WIN_D(event.getKeyCode(), false)) {
+                HXSHttpRequestCenter.requestSendKey("win-d", null);
+                return true;
+            }
+            if (handleSpecialKeys_WIN_Q(event.getKeyCode(), false)) {
+                super.onBackPressed();
+                return true;
             }
 
             if (handleSpecialKeys(event.getKeyCode(), false)) {
@@ -1358,12 +1527,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return true;
     }
 
-    private TouchContext getTouchContext(int actionIndex)
-    {
+    private TouchContext getTouchContext(int actionIndex) {
         if (actionIndex < touchContextMap.length) {
             return touchContextMap[actionIndex];
-        }
-        else {
+        } else {
             return null;
         }
     }
@@ -1388,11 +1555,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             if (controllerHandler.handleMotionEvent(event)) {
                 return true;
             }
-        }
-        else if ((eventSource & InputDevice.SOURCE_CLASS_POINTER) != 0 ||
-                 (eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0 ||
-                 eventSource == InputDevice.SOURCE_MOUSE_RELATIVE)
-        {
+        } else if ((eventSource & InputDevice.SOURCE_CLASS_POINTER) != 0 ||
+                (eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0 ||
+                eventSource == InputDevice.SOURCE_MOUSE_RELATIVE) {
             // This case is for mice and non-finger touch devices
             if (eventSource == InputDevice.SOURCE_MOUSE ||
                     (eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0 || // SOURCE_TOUCHPAD
@@ -1412,11 +1577,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if (eventSource == 12290) {
                     if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
                         buttonState |= MotionEvent.BUTTON_PRIMARY;
-                    }
-                    else if (event.getAction() == MotionEvent.ACTION_UP) {
+                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
                         buttonState &= ~MotionEvent.BUTTON_PRIMARY;
-                    }
-                    else {
+                    } else {
                         // We may be faking the primary button down from a previous event,
                         // so be sure to add that bit back into the button state.
                         buttonState |= (lastButtonState & MotionEvent.BUTTON_PRIMARY);
@@ -1437,19 +1600,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 // significantly different than before.
                 if (inputCaptureProvider.eventHasRelativeMouseAxes(event)) {
                     // Send the deltas straight from the motion event
-                    short deltaX = (short)inputCaptureProvider.getRelativeAxisX(event);
-                    short deltaY = (short)inputCaptureProvider.getRelativeAxisY(event);
+                    short deltaX = (short) inputCaptureProvider.getRelativeAxisX(event);
+                    short deltaY = (short) inputCaptureProvider.getRelativeAxisY(event);
 
                     if (deltaX != 0 || deltaY != 0) {
                         if (prefConfig.absoluteMouseMode) {
-                            conn.sendMouseMoveAsMousePosition(deltaX, deltaY, (short)view.getWidth(), (short)view.getHeight());
-                        }
-                        else {
+                            conn.sendMouseMoveAsMousePosition(deltaX, deltaY, (short) view.getWidth(), (short) view.getHeight());
+                        } else {
                             conn.sendMouseMove(deltaX, deltaY);
                         }
                     }
-                }
-                else if ((eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0) {
+                } else if ((eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0) {
                     // If this input device is not associated with the view itself (like a trackpad),
                     // we'll convert the device-specific coordinates to use to send the cursor position.
                     // This really isn't ideal but it's probably better than nothing.
@@ -1464,32 +1625,30 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                         // All touchpads coordinate planes should start at (0, 0)
                         if (xRange != null && yRange != null && xRange.getMin() == 0 && yRange.getMin() == 0) {
-                            int xMax = (int)xRange.getMax();
-                            int yMax = (int)yRange.getMax();
+                            int xMax = (int) xRange.getMax();
+                            int yMax = (int) yRange.getMax();
 
                             // Touchpads must be smaller than (65535, 65535)
                             if (xMax <= Short.MAX_VALUE && yMax <= Short.MAX_VALUE) {
-                                conn.sendMousePosition((short)event.getX(), (short)event.getY(),
-                                                       (short)xMax, (short)yMax);
+                                conn.sendMousePosition((short) event.getX(), (short) event.getY(),
+                                        (short) xMax, (short) yMax);
                             }
                         }
                     }
-                }
-                else if (view != null) {
+                } else if (view != null) {
                     // Otherwise send absolute position based on the view for SOURCE_CLASS_POINTER
                     updateMousePosition(view, event);
                 }
 
                 if (event.getActionMasked() == MotionEvent.ACTION_SCROLL) {
                     // Send the vertical scroll packet
-                    conn.sendMouseHighResScroll((short)(event.getAxisValue(MotionEvent.AXIS_VSCROLL) * 120));
+                    conn.sendMouseHighResScroll((short) (event.getAxisValue(MotionEvent.AXIS_VSCROLL) * 120));
                 }
 
                 if ((changedButtons & MotionEvent.BUTTON_PRIMARY) != 0) {
                     if ((buttonState & MotionEvent.BUTTON_PRIMARY) != 0) {
                         conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_LEFT);
-                    }
-                    else {
+                    } else {
                         conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
                     }
                 }
@@ -1498,8 +1657,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if ((changedButtons & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_STYLUS_PRIMARY)) != 0) {
                     if ((buttonState & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_STYLUS_PRIMARY)) != 0) {
                         conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
-                    }
-                    else {
+                    } else {
                         conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT);
                     }
                 }
@@ -1508,8 +1666,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if ((changedButtons & (MotionEvent.BUTTON_TERTIARY | MotionEvent.BUTTON_STYLUS_SECONDARY)) != 0) {
                     if ((buttonState & (MotionEvent.BUTTON_TERTIARY | MotionEvent.BUTTON_STYLUS_SECONDARY)) != 0) {
                         conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_MIDDLE);
-                    }
-                    else {
+                    } else {
                         conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_MIDDLE);
                     }
                 }
@@ -1518,8 +1675,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     if ((changedButtons & MotionEvent.BUTTON_BACK) != 0) {
                         if ((buttonState & MotionEvent.BUTTON_BACK) != 0) {
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X1);
-                        }
-                        else {
+                        } else {
                             conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X1);
                         }
                     }
@@ -1527,8 +1683,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     if ((changedButtons & MotionEvent.BUTTON_FORWARD) != 0) {
                         if ((buttonState & MotionEvent.BUTTON_FORWARD) != 0) {
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X2);
-                        }
-                        else {
+                        } else {
                             conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X2);
                         }
                     }
@@ -1552,8 +1707,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                             // Eraser is right click
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
                         }
-                    }
-                    else if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    } else if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
                         if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
                             lastAbsTouchUpTime = event.getEventTime();
                             lastAbsTouchUpX = event.getX(0);
@@ -1575,11 +1729,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 lastButtonState = buttonState;
             }
             // This case is for fingers
-            else
-            {
+            else {
                 if (virtualController != null &&
                         (virtualController.getControllerMode() == VirtualController.ControllerMode.MoveButtons ||
-                         virtualController.getControllerMode() == VirtualController.ControllerMode.ResizeButtons)) {
+                                virtualController.getControllerMode() == VirtualController.ControllerMode.ResizeButtons)) {
                     // Ignore presses when the virtual controller is being configured
                     return true;
                 }
@@ -1590,16 +1743,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if (view != streamView && !prefConfig.touchscreenTrackpad) {
                     xOffset = -streamView.getX();
                     yOffset = -streamView.getY();
-                }
-                else {
+                } else {
                     xOffset = 0.f;
                     yOffset = 0.f;
                 }
 
                 int actionIndex = event.getActionIndex();
 
-                int eventX = (int)(event.getX(actionIndex) + xOffset);
-                int eventY = (int)(event.getY(actionIndex) + yOffset);
+                int eventX = (int) (event.getX(actionIndex) + xOffset);
+                int eventY = (int) (event.getY(actionIndex) + yOffset);
 
                 // Special handling for 3 finger gesture
                 if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN &&
@@ -1621,81 +1773,77 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     return false;
                 }
 
-                switch (event.getActionMasked())
-                {
-                case MotionEvent.ACTION_POINTER_DOWN:
-                case MotionEvent.ACTION_DOWN:
-                    for (TouchContext touchContext : touchContextMap) {
-                        touchContext.setPointerCount(event.getPointerCount());
-                    }
-                    context.touchDownEvent(eventX, eventY, event.getEventTime(), true);
-                    break;
-                case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_UP:
-                    if (event.getPointerCount() == 1 &&
-                            (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || (event.getFlags() & MotionEvent.FLAG_CANCELED) == 0)) {
-                        // All fingers up
-                        if (event.getEventTime() - threeFingerDownTime < THREE_FINGER_TAP_THRESHOLD) {
-                            // This is a 3 finger tap to bring up the keyboard
-                            toggleKeyboard();
-                            return true;
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_POINTER_DOWN:
+                    case MotionEvent.ACTION_DOWN:
+                        for (TouchContext touchContext : touchContextMap) {
+                            touchContext.setPointerCount(event.getPointerCount());
                         }
-                    }
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && (event.getFlags() & MotionEvent.FLAG_CANCELED) != 0) {
-                        context.cancelTouch();
-                    }
-                    else {
-                        context.touchUpEvent(eventX, eventY, event.getEventTime());
-                    }
-
-                    for (TouchContext touchContext : touchContextMap) {
-                        touchContext.setPointerCount(event.getPointerCount() - 1);
-                    }
-                    if (actionIndex == 0 && event.getPointerCount() > 1 && !context.isCancelled()) {
-                        // The original secondary touch now becomes primary
-                        context.touchDownEvent(
-                                (int)(event.getX(1) + xOffset),
-                                (int)(event.getY(1) + yOffset),
-                                event.getEventTime(), false);
-                    }
-                    break;
-                case MotionEvent.ACTION_MOVE:
-                    // ACTION_MOVE is special because it always has actionIndex == 0
-                    // We'll call the move handlers for all indexes manually
-
-                    // First process the historical events
-                    for (int i = 0; i < event.getHistorySize(); i++) {
-                        for (TouchContext aTouchContextMap : touchContextMap) {
-                            if (aTouchContextMap.getActionIndex() < event.getPointerCount())
-                            {
-                                aTouchContextMap.touchMoveEvent(
-                                        (int)(event.getHistoricalX(aTouchContextMap.getActionIndex(), i) + xOffset),
-                                        (int)(event.getHistoricalY(aTouchContextMap.getActionIndex(), i) + yOffset),
-                                        event.getHistoricalEventTime(i));
+                        context.touchDownEvent(eventX, eventY, event.getEventTime(), true);
+                        break;
+                    case MotionEvent.ACTION_POINTER_UP:
+                    case MotionEvent.ACTION_UP:
+                        if (event.getPointerCount() == 1 &&
+                                (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || (event.getFlags() & MotionEvent.FLAG_CANCELED) == 0)) {
+                            // All fingers up
+                            if (event.getEventTime() - threeFingerDownTime < THREE_FINGER_TAP_THRESHOLD) {
+                                // This is a 3 finger tap to bring up the keyboard
+                                toggleKeyboard();
+                                return true;
                             }
                         }
-                    }
 
-                    // Now process the current values
-                    for (TouchContext aTouchContextMap : touchContextMap) {
-                        if (aTouchContextMap.getActionIndex() < event.getPointerCount())
-                        {
-                            aTouchContextMap.touchMoveEvent(
-                                    (int)(event.getX(aTouchContextMap.getActionIndex()) + xOffset),
-                                    (int)(event.getY(aTouchContextMap.getActionIndex()) + yOffset),
-                                    event.getEventTime());
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && (event.getFlags() & MotionEvent.FLAG_CANCELED) != 0) {
+                            context.cancelTouch();
+                        } else {
+                            context.touchUpEvent(eventX, eventY, event.getEventTime());
                         }
-                    }
-                    break;
-                case MotionEvent.ACTION_CANCEL:
-                    for (TouchContext aTouchContext : touchContextMap) {
-                        aTouchContext.cancelTouch();
-                        aTouchContext.setPointerCount(0);
-                    }
-                    break;
-                default:
-                    return false;
+
+                        for (TouchContext touchContext : touchContextMap) {
+                            touchContext.setPointerCount(event.getPointerCount() - 1);
+                        }
+                        if (actionIndex == 0 && event.getPointerCount() > 1 && !context.isCancelled()) {
+                            // The original secondary touch now becomes primary
+                            context.touchDownEvent(
+                                    (int) (event.getX(1) + xOffset),
+                                    (int) (event.getY(1) + yOffset),
+                                    event.getEventTime(), false);
+                        }
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        // ACTION_MOVE is special because it always has actionIndex == 0
+                        // We'll call the move handlers for all indexes manually
+
+                        // First process the historical events
+                        for (int i = 0; i < event.getHistorySize(); i++) {
+                            for (TouchContext aTouchContextMap : touchContextMap) {
+                                if (aTouchContextMap.getActionIndex() < event.getPointerCount()) {
+                                    aTouchContextMap.touchMoveEvent(
+                                            (int) (event.getHistoricalX(aTouchContextMap.getActionIndex(), i) + xOffset),
+                                            (int) (event.getHistoricalY(aTouchContextMap.getActionIndex(), i) + yOffset),
+                                            event.getHistoricalEventTime(i));
+                                }
+                            }
+                        }
+
+                        // Now process the current values
+                        for (TouchContext aTouchContextMap : touchContextMap) {
+                            if (aTouchContextMap.getActionIndex() < event.getPointerCount()) {
+                                aTouchContextMap.touchMoveEvent(
+                                        (int) (event.getX(aTouchContextMap.getActionIndex()) + xOffset),
+                                        (int) (event.getY(aTouchContextMap.getActionIndex()) + yOffset),
+                                        event.getEventTime());
+                            }
+                        }
+                        break;
+                    case MotionEvent.ACTION_CANCEL:
+                        for (TouchContext aTouchContext : touchContextMap) {
+                            aTouchContext.cancelTouch();
+                            aTouchContext.setPointerCount(0);
+                        }
+                        break;
+                    default:
+                        return false;
                 }
             }
 
@@ -1705,6 +1853,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Unknown class
         return false;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (disableTouch) {
+            return true;
+        }
+        return handleMotionEvent(null, event) || super.onTouchEvent(event);
+
     }
 
     @Override
@@ -1721,8 +1878,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (touchedView == streamView) {
             eventX = event.getX(0);
             eventY = event.getY(0);
-        }
-        else {
+        } else {
             // For the containing background view, we must subtract the origin
             // of the StreamView to get video-relative coordinates.
             eventX = event.getX(0) - streamView.getX();
@@ -1731,8 +1887,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (event.getPointerCount() == 1 && event.getActionIndex() == 0 &&
                 (event.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER ||
-                event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS))
-        {
+                        event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS)) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_HOVER_ENTER:
@@ -1763,7 +1918,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         eventX = Math.min(Math.max(eventX, 0), streamView.getWidth());
         eventY = Math.min(Math.max(eventY, 0), streamView.getHeight());
 
-        conn.sendMousePosition((short)eventX, (short)eventY, (short)streamView.getWidth(), (short)streamView.getHeight());
+        conn.sendMousePosition((short) eventX, (short) eventY, (short) streamView.getWidth(), (short) streamView.getHeight());
     }
 
     @Override
@@ -1774,6 +1929,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouch(View view, MotionEvent event) {
+
+        if (disableTouch) {
+            return true;
+        }
+
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 // Tell the OS not to buffer input events for us
@@ -1845,21 +2006,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                     // If video initialization failed and the surface is still valid, display extra information for the user
                     if (stage.contains("video") && streamView.getHolder().getSurface().isValid()) {
-                        Toast.makeText(Game.this, getResources().getText(R.string.video_decoder_init_failed), Toast.LENGTH_LONG).show();
+                        // Toast.makeText(Game.this, getResources().getText(R.string.video_decoder_init_failed), Toast.LENGTH_LONG).show();
                     }
 
-                    String dialogText = getResources().getString(R.string.conn_error_msg) + " " + stage +" (error "+errorCode+")";
-
-                    if (portFlags != 0) {
-                        dialogText += "\n\n" + getResources().getString(R.string.check_ports_msg) + "\n" +
-                                MoonBridge.stringifyPortFlags(portFlags, "\n");
-                    }
-
-                    if (portTestResult != MoonBridge.ML_TEST_RESULT_INCONCLUSIVE && portTestResult != 0)  {
-                        dialogText += "\n\n" + getResources().getString(R.string.nettest_text_blocked);
-                    }
-
-                    Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_error_title), dialogText, true);
+                    Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_error_title),
+                            getResources().getString(R.string.conn_error_msg) + "  (" + errorCode + ")", true);
                 }
             }
         });
@@ -1867,77 +2018,121 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void connectionTerminated(final int errorCode) {
-        // Perform a connection test if the failure could be due to a blocked port
-        // This does network I/O, so don't do it on the main thread.
-        final int portFlags = MoonBridge.getPortFlagsFromTerminationErrorCode(errorCode);
-        final int portTestResult = MoonBridge.testClientConnectivity(ServerHelper.CONNECTION_TEST_SERVER,443, portFlags);
+        //        runOnUiThread(new Runnable() {
+        //            @Override
+        //            public void run() {
+        //                // Let the display go to sleep now
+        //                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        //
+        //                // Enable cursor visibility again
+        //                inputCaptureProvider.disableCapture();
+        //
+        //                if (!displayedFailureDialog) {
+        //                    displayedFailureDialog = true;
+        //                    HXSLog.severe("Connection terminated: " + errorCode);
+        //                    stopConnection();
+        //
+        //                    // Display the error dialog if it was an unexpected termination.
+        //                    // Otherwise, just finish the activity immediately.
+        //                    if (errorCode != HXStreamBridge.ML_ERROR_GRACEFUL_TERMINATION) {
+        //                        String message;
+        //
+        //                        switch (errorCode) {
+        //                            case HXStreamBridge.ML_ERROR_NO_VIDEO_TRAFFIC:
+        //                                message = "没有音频连接";
+        //                                break;
+        //
+        //                            default:
+        //                                message = getResources().getString(R.string.conn_terminated_msg);
+        //                                break;
+        //                        }
+        //
+        //                        Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_terminated_title),
+        //                                message, true);
+        //                    } else {
+        //                        finish();
+        //                    }
+        //                }
+        //            }
+        //        });
 
-        runOnUiThread(new Runnable() {
+        handler.post(new Runnable() {
             @Override
             public void run() {
-                // Let the display go to sleep now
-                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if (errorCode == -1) {
+                    // Enable cursor visibility again
+                    inputCaptureProvider.disableCapture();
 
-                // Enable cursor visibility again
-                inputCaptureProvider.disableCapture();
+                    if (!displayedFailureDialog) {
+                        displayedFailureDialog = true;
+                        HXSLog.severe("Connection terminated: " + errorCode);
+                        stopConnection();
 
-                // Disable meta key capture
-                setMetaKeyCaptureState(false);
-
-                if (!displayedFailureDialog) {
-                    displayedFailureDialog = true;
-                    LimeLog.severe("Connection terminated: " + errorCode);
-                    stopConnection();
-
-                    // Display the error dialog if it was an unexpected termination.
-                    // Otherwise, just finish the activity immediately.
-                    if (errorCode != MoonBridge.ML_ERROR_GRACEFUL_TERMINATION) {
-                        String message;
-
-                        if (portTestResult != MoonBridge.ML_TEST_RESULT_INCONCLUSIVE && portTestResult != 0) {
-                            // If we got a blocked result, that supersedes any other error message
-                            message = getResources().getString(R.string.nettest_text_blocked);
+                        if (errorCode == -1) {
                         }
-                        else {
-                            switch (errorCode) {
-                                case MoonBridge.ML_ERROR_NO_VIDEO_TRAFFIC:
-                                    message = getResources().getString(R.string.no_video_received_error);
-                                    break;
-
-                                case MoonBridge.ML_ERROR_NO_VIDEO_FRAME:
-                                    message = getResources().getString(R.string.no_frame_received_error);
-                                    break;
-
-                                case MoonBridge.ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
-                                case MoonBridge.ML_ERROR_PROTECTED_CONTENT:
-                                    message = getResources().getString(R.string.early_termination_error);
-                                    break;
-
-                                case MoonBridge.ML_ERROR_FRAME_CONVERSION:
-                                    message = getResources().getString(R.string.frame_conversion_error);
-                                    break;
-
-                                default:
-                                    message = getResources().getString(R.string.conn_terminated_msg);
-                                    break;
-                            }
+                        switch (errorCode) {
+                            case 266:
+                                Toast.makeText(Game.this, "此账号已在其他设备登录并上机，若非本人操作，请修改密码", Toast.LENGTH_LONG).show();
+                                ;
+                                break;
                         }
-
-                        if (portFlags != 0) {
-                            message += "\n\n" + getResources().getString(R.string.check_ports_msg) + "\n" +
-                                    MoonBridge.stringifyPortFlags(portFlags, "\n");
-                        }
-
-                        Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_terminated_title),
-                                message, true);
-                    }
-                    else {
-                        finish();
+                        onceBackPressed();
                     }
                 }
             }
         });
     }
+
+    public void enterMoveButton() {
+        if (dialog != null) {
+            if (dialog.isShowing()) {
+                dialog.dismiss();
+            }
+        }
+        tab = new HXSMoveTopTab(this, null);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT);
+        params.topMargin = 0;
+        addContentView(tab, params);
+        virtualController.setCurrentMode(VirtualController.ControllerMode.MoveButtons);
+    }
+
+    public void removeTab() {
+        if (tab != null) {
+            if (tab.getParent() != null) {
+                ((ViewGroup) tab.getParent()).removeView(tab);
+            }
+        }
+        virtualController.setCurrentMode(VirtualController.ControllerMode.Active);
+        VirtualControllerConfigurationLoader.saveProfile();
+    }
+
+    public void resetViewController() {
+        HXSControllerPositionPreference.getInstance().resetDefaultPositions();
+        virtualController.refreshLayout();
+        virtualController.setAlpha(alpha * 255 / 50);
+        removeTab();
+    }
+
+    public void openTouchPad() {
+        isTouchPadOpen = true;
+        VirtualControllerElement.getPosition(VirtualControllerElement.EID_INVISIBLE_TOUCH_PAD).visitable = true;
+        VirtualControllerElement.getPosition(VirtualControllerElement.EID_RS).visitable = false;
+        virtualController.refreshLayout();
+    }
+
+    public void openRS() {
+        isTouchPadOpen = false;
+        VirtualControllerElement.getPosition(VirtualControllerElement.EID_INVISIBLE_TOUCH_PAD).visitable = false;
+        VirtualControllerElement.getPosition(VirtualControllerElement.EID_RS).visitable = true;
+        virtualController.refreshLayout();
+    }
+
+    private void onceBackPressed() {
+        super.onBackPressed();
+    }
+
 
     @Override
     public void connectionStatusUpdate(final int connectionStatus) {
@@ -1951,14 +2146,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if (connectionStatus == MoonBridge.CONN_STATUS_POOR) {
                     if (prefConfig.bitrate > 5000) {
                         notificationOverlayView.setText(getResources().getString(R.string.slow_connection_msg));
-                    }
-                    else {
+                    } else {
                         notificationOverlayView.setText(getResources().getString(R.string.poor_connection_msg));
                     }
 
                     requestedNotificationOverlayVisibility = View.VISIBLE;
-                }
-                else if (connectionStatus == MoonBridge.CONN_STATUS_OKAY) {
+                } else if (connectionStatus == MoonBridge.CONN_STATUS_OKAY) {
                     requestedNotificationOverlayVisibility = View.GONE;
                 }
 
@@ -2034,7 +2227,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void rumble(short controllerNumber, short lowFreqMotor, short highFreqMotor) {
-        LimeLog.info(String.format((Locale)null, "Rumble on gamepad %d: %04x %04x", controllerNumber, lowFreqMotor, highFreqMotor));
+        LimeLog.info(String.format((Locale) null, "Rumble on gamepad %d: %04x %04x", controllerNumber, lowFreqMotor, highFreqMotor));
 
         controllerHandler.handleRumble(controllerNumber, lowFreqMotor, highFreqMotor);
     }
@@ -2098,32 +2291,30 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public void mouseButtonEvent(int buttonId, boolean down) {
         byte buttonIndex;
 
-        switch (buttonId)
-        {
-        case EvdevListener.BUTTON_LEFT:
-            buttonIndex = MouseButtonPacket.BUTTON_LEFT;
-            break;
-        case EvdevListener.BUTTON_MIDDLE:
-            buttonIndex = MouseButtonPacket.BUTTON_MIDDLE;
-            break;
-        case EvdevListener.BUTTON_RIGHT:
-            buttonIndex = MouseButtonPacket.BUTTON_RIGHT;
-            break;
-        case EvdevListener.BUTTON_X1:
-            buttonIndex = MouseButtonPacket.BUTTON_X1;
-            break;
-        case EvdevListener.BUTTON_X2:
-            buttonIndex = MouseButtonPacket.BUTTON_X2;
-            break;
-        default:
-            LimeLog.warning("Unhandled button: "+buttonId);
-            return;
+        switch (buttonId) {
+            case EvdevListener.BUTTON_LEFT:
+                buttonIndex = MouseButtonPacket.BUTTON_LEFT;
+                break;
+            case EvdevListener.BUTTON_MIDDLE:
+                buttonIndex = MouseButtonPacket.BUTTON_MIDDLE;
+                break;
+            case EvdevListener.BUTTON_RIGHT:
+                buttonIndex = MouseButtonPacket.BUTTON_RIGHT;
+                break;
+            case EvdevListener.BUTTON_X1:
+                buttonIndex = MouseButtonPacket.BUTTON_X1;
+                break;
+            case EvdevListener.BUTTON_X2:
+                buttonIndex = MouseButtonPacket.BUTTON_X2;
+                break;
+            default:
+                LimeLog.warning("Unhandled button: " + buttonId);
+                return;
         }
 
         if (down) {
             conn.sendMouseButtonDown(buttonIndex);
-        }
-        else {
+        } else {
             conn.sendMouseButtonUp(buttonIndex);
         }
     }
@@ -2144,8 +2335,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
             if (buttonDown) {
                 conn.sendKeyboardInput(keyMap, KeyboardPacket.KEY_DOWN, getModifierState());
-            }
-            else {
+            } else {
                 conn.sendKeyboardInput(keyMap, KeyboardPacket.KEY_UP, getModifierState());
             }
         }
@@ -2164,12 +2354,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         // This flag is only set on 4.4+
         else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT &&
-                 (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+                (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
             hideSystemUi(2000);
         }
         // This flag is only set before 4.4+
         else if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT &&
-                 (visibility & View.SYSTEM_UI_FLAG_LOW_PROFILE) == 0) {
+                (visibility & View.SYSTEM_UI_FLAG_LOW_PROFILE) == 0) {
             hideSystemUi(2000);
         }
     }
@@ -2209,4 +2399,419 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 return false;
         }
     }
+
+    public static void showKeyboardNum() {
+        if (keyboardNum != null) {
+            keyboardNum.setVisibility(View.VISIBLE);
+        }
+        if (keyboard != null) {
+            keyboard.setVisibility(View.GONE);
+        }
+        isKeyboardShown = true;
+    }
+
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull String name, @NonNull Context context, @NonNull AttributeSet attrs) {
+        AutoSize.autoConvertDensityOfGlobal(this);
+        return super.onCreateView(name, context, attrs);
+    }
+
+    private void initializeTouchContexts(final int touchType) {
+
+        for (int i = 0; i < touchContextMap.length; i++) {
+            switch (touchType) {
+                case TOUCH_TYPE_RELATIVE:
+                    touchContextMap[i] = new RelativeTouchContext(conn, i,
+                            REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
+                            streamView, prefConfig);
+                    break;
+                case TOUCH_TYPE_ABSOLUTE:
+                    touchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
+
+                    break;
+                case TOUCH_TYPE_NON:
+                    touchContextMap[i] = new NoTouchContext();
+                    break;
+            }
+
+        }
+    }
+
+    public void showKeyboardABC() {
+        if (useSourceKeyboard) {
+            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY);
+            return;
+        }
+        if (keyboardNum != null) {
+            keyboardNum.setVisibility(View.GONE);
+        }
+        if (keyboard != null) {
+            keyboard.setVisibility(View.VISIBLE);
+        }
+        isKeyboardShown = true;
+    }
+
+    @Override
+    public void onKeyboardClicked() {
+        //虚拟键盘打开
+        if (isKeyboardShown) {
+            hideKeyboards();
+        } else {
+            showKeyboardABC();
+        }
+    }
+
+    public void hideKeyboards() {
+        if (useSourceKeyboard) {
+            imm.toggleSoftInput(0, InputMethodManager.HIDE_IMPLICIT_ONLY);
+            return;
+        }
+        if (keyboardNum != null) {
+            keyboardNum.setVisibility(View.GONE);
+        }
+        if (keyboard != null) {
+            keyboard.setVisibility(View.GONE);
+        }
+        isKeyboardShown = false;
+
+    }
+
+    public void setTouchType(int touchType) {
+        this.touchType = touchType;
+        initializeTouchContexts(touchType);
+        HXStreamViewPreference.saveTouchType(touchType);
+    }
+
+    @Override
+    public void onBackClicked() {
+        super.onBackPressed();
+    }
+
+    @Override
+    public void onCloseClicked() {
+    }
+
+    @Override
+    public void onSettingClicked() {
+        openSettingDialog();
+    }
+
+    public void openSettingDialog() {
+        //串流内设置
+        dialog = new HXSVMSettingDialog(Game.this);
+        dialog.show();
+        WindowManager windowManager = getWindowManager();
+        Display display = windowManager.getDefaultDisplay();
+        WindowManager.LayoutParams lp = dialog.getWindow().getAttributes();
+        lp.width = (int) (display.getWidth() * 0.628);
+        lp.height = (int) (display.getHeight() * 0.81);
+        dialog.getWindow().setAttributes(lp);
+        dialog.setCancelable(false);
+    }
+
+    @Override
+    public void onShutdownClicked() {
+        //获取下机按钮
+        alterDialog = new HXSAlterDialog(this)
+                .setTvMessage("您准备？")
+                .setTvRecommendBtn("取消")
+                .setTvRightBtn("挂机")
+                .setTvMiddleBtn("下机")
+                .setTvRightBtnListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        HXSSuspendDialog dialogSuspend = new HXSSuspendDialog(Game.this);
+                        alterDialog.dismiss();
+                        dialogSuspend.show();
+                        WindowManager windowManager = getWindowManager();
+                        Display display = windowManager.getDefaultDisplay();
+                        WindowManager.LayoutParams lp = dialogSuspend.getWindow().getAttributes();
+                        lp.width = (int) (display.getWidth() * 0.266);
+                        lp.height = (int) (display.getHeight() * 0.493);
+                        dialogSuspend.getWindow().setAttributes(lp);
+                    }
+                })
+                .setTvRecommendBtnListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        alterDialog.dismiss();
+                    }
+                })
+                .setTvMiddleBtnListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        alterDialog.setTvMessage("结账下机？");
+                        alterDialog.setTvRecommendBtn("取消")
+                                .setTvRecommendBtnListener(new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View view) {
+                                        alterDialog.dismiss();
+                                    }
+                                })
+                                .setTvRightBtn("下机")
+                                .setTvMiddleBtn("")
+                                .setTvRightBtnListener(new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View view) {
+                                        HXSHttpRequestCenter.requestShutdownVm(new HXSHttpRequestCenter.IOnRequestCompletionDataReturn() {
+                                            @Override
+                                            public void returnAnalysis(String result) {
+                                                HXStreamDelegate.getInstance().onShutdownReturn(result);
+                                                Game.super.onBackPressed();
+                                            }
+                                        });
+                                    }
+                                })
+                                .setTvRecommendBtnListener(new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View view) {
+                                        alterDialog.dismiss();
+                                    }
+                                });
+                    }
+                });
+        alterDialog.show();
+        WindowManager windowManager = getWindowManager();
+        Display display = windowManager.getDefaultDisplay();
+        WindowManager.LayoutParams lp = alterDialog.getWindow().getAttributes();
+        lp.width = (int) (display.getWidth() * 0.266);
+        lp.height = (int) (display.getHeight() * 0.494);
+        alterDialog.getWindow().setAttributes(lp);
+
+    }
+
+    @Override
+    public void onDesktopClicked() {
+        HXSHttpRequestCenter.requestSendKey("win-d", null);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (isBackPressed) {
+            super.onBackPressed();
+        } else {
+            isBackPressed = true;
+            new HXSToast(Game.this, "再按一次返回").show();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        sleep(5000);
+                        isBackPressed = false;
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        }
+    }
+
+    public void setControllerAlpha(int alpha) {
+        if (virtualController != null) {
+            virtualController.setAlpha(alpha);
+        }
+    }
+
+    public void setControllerVisible(boolean visible) {
+        if (visible) {
+            virtualController.show();
+        } else {
+            virtualController.hide();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HXSHttpRequestCenter.refreshBalance(new HXSHttpRequestCenter.IOnRequestCompletionDataReturn() {
+                    @Override
+                    public void returnAnalysis(String returnResult) {
+                        HXSLog.info("个人信息返回" + returnResult);
+                        try {
+                            JSONObject result = new JSONObject(returnResult);
+                            switch (result.getInt("code")) {
+
+                                case 200:
+                                    JSONObject resultData = new JSONObject(result.getString("data"));
+                                    HXSUserModule.getInstance().balance = resultData.getString("userbalance");
+                                    HXSUserModule.getInstance().bonus = resultData.getString("bonus");
+                                    break;
+
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+            }
+        }).start();
+        isGameRunning = true;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (isGameRunning) {
+
+
+                    try {
+                        int averageEndToEndLat = decoderRenderer.getAverageEndToEndLatency();
+                        int averageDecoderLat = decoderRenderer.getAverageDecoderLatency();
+                        int delay = -1;
+                        if (averageEndToEndLat > 0) {
+                            delay = averageEndToEndLat;
+                            if (averageDecoderLat > 0) {
+                                delay = averageDecoderLat;
+                            }
+                        } else if (averageDecoderLat > 0) {
+                            delay = averageDecoderLat;
+                        }
+                        int finalDelay = delay;
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                tvDelayOverlay.setText(finalDelay + "ms");
+
+                                //                                int videoFormat = decoderRenderer.getActiveVideoFormat();
+                                //                                String message = "";
+                                //                                if (videoFormat == HXStreamBridge.VIDEO_FORMAT_H265_MAIN10) {
+                                //                                    message += " [H.265 HDR]";
+                                //                                } else if (videoFormat == HXStreamBridge.VIDEO_FORMAT_H265) {
+                                //                                    message += " [H.265]";
+                                //                                } else if (videoFormat == HXStreamBridge.VIDEO_FORMAT_H264) {
+                                //                                    message += " [H.264]";
+                                //                                }
+                                //                                HXSLog.info("解码格式"+message);
+                            }
+                        });
+                        sleep(5000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                HXSConnection.getInstance().getCallback().onStreamActivityAppear();
+            }
+        });
+    }
+
+    private boolean handleSpecialKeys_WIN_D(int androidKeyCode, boolean down) {
+        int modifierMask = 0;
+
+        if (androidKeyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_CTRL;
+        } else if (androidKeyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_SHIFT;
+        } else if (androidKeyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_ALT;
+        }
+
+        if (down) {
+            this.modifierFlags |= modifierMask;
+        } else {
+            this.modifierFlags &= ~modifierMask;
+        }
+        //组合键
+        // Check if Ctrl+Shift+Z+Alt is pressed
+        if (androidKeyCode == KeyEvent.KEYCODE_D &&
+                (modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT | KeyboardPacket.MODIFIER_ALT)) ==
+                        (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT | KeyboardPacket.MODIFIER_ALT)) {
+            if (down) {
+                // Now that we've pressed the magic combo
+                // we'll wait for one of the keys to come up
+                grabComboDown = true;
+            } else {
+                // Toggle the grab if D comes up
+
+
+                grabComboDown = false;
+            }
+
+            return true;
+        }
+        // Toggle the grab if control or shift comes up
+        else if (grabComboDown) {
+
+
+            grabComboDown = false;
+            return false;
+        }
+
+        // Not a special combo
+        return false;
+    }
+
+    private boolean handleSpecialKeys_WIN_Q(int androidKeyCode, boolean down) {
+        int modifierMask = 0;
+
+        if (androidKeyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_CTRL;
+        } else if (androidKeyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_SHIFT;
+        } else if (androidKeyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_ALT;
+        }
+
+        if (down) {
+            this.modifierFlags |= modifierMask;
+        } else {
+            this.modifierFlags &= ~modifierMask;
+        }
+        //组合键
+        // Check if Ctrl+Shift+Z+Alt is pressed
+        if (androidKeyCode == KeyEvent.KEYCODE_Q &&
+                (modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT | KeyboardPacket.MODIFIER_ALT)) ==
+                        (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT | KeyboardPacket.MODIFIER_ALT)) {
+            if (down) {
+                // Now that we've pressed the magic combo
+                // we'll wait for one of the keys to come up
+                grabComboDown = true;
+            } else {
+                // Toggle the grab if D comes up
+
+
+                grabComboDown = false;
+            }
+
+            return true;
+        }
+        // Toggle the grab if control or shift comes up
+        else if (grabComboDown) {
+
+
+            grabComboDown = false;
+            return false;
+        }
+
+        // Not a special combo
+        return false;
+    }
+
+    @Override
+    public boolean isBaseOnWidth() {
+        return !(this.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT);
+    }
+
+    @Override
+    public float getSizeInDp() {
+        return 0;
+    }
+
+    public int getTouchType() {
+        return touchType;
+    }
+
 }

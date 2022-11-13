@@ -1,8 +1,9 @@
 <merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".Game" >
+    tools:context=".Game">
 
     <View
         android:id="@+id/backgroundTouchView"
@@ -26,28 +27,86 @@
         android:id="@+id/performanceOverlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="10dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="10dp"
         android:layout_gravity="left"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:gravity="left"
+        android:layout_marginStart="10dp"
+        android:layout_marginLeft="10dp"
+        android:layout_marginTop="10dp"
         android:background="#80000000"
-        android:preferKeepClear="true"
+        android:gravity="left"
+        android:textAppearance="?android:attr/textAppearanceSmall"
         android:visibility="gone" />
 
     <TextView
         android:id="@+id/notificationOverlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginRight="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginTop="10dp"
         android:layout_gravity="right"
-        android:textAppearance="?android:attr/textAppearanceLarge"
-        android:gravity="right"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginRight="10dp"
         android:background="#80000000"
-        android:preferKeepClear="true"
+        android:gravity="right"
+        android:textAppearance="?android:attr/textAppearanceLarge"
         android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/vmMessageOverlay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="left"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginRight="10dp"
+        android:background="#80000000"
+        android:gravity="left"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:visibility="gone" />
+
+    <!--  <com.limelight.ui.view.HXSDragView
+          android:id="@+id/dv_drag_view"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          app:animationTime="200"
+          app:bounce="true"
+          app:dragHeight="100dp"
+          app:dragWidth="111dp"
+          app:foregroundImage="@mipmap/ic_tabbar"
+          app:marginTop="400"
+          app:welt="true" >
+      </com.limelight.ui.view.HXSDragView>
+  -->
+    <com.limelight.ui.view.HXSControlTab
+        android:id="@+id/tab_control"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="605dp"
+        />
+
+    <TextView
+        android:id="@+id/tv_delay_overlay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="10dp"
+        android:textColor="#FFFFFF"
+        android:visibility="gone"
+        />
+    <ImageView
+        android:id="@+id/iv_image_cover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:visibility="visible" />
+    <com.limelight.ui.view.HXSKeyboardNum
+        android:id="@+id/keyboard_num"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        />
+    <com.limelight.ui.view.HXSKeyboard
+        android:id="@+id/keyboard_abc"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        />
 
 </merge>

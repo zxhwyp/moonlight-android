@@ -17,6 +17,7 @@ import javax.crypto.SecretKey;
 import org.xmlpull.v1.XmlPullParserException;
 
 import com.limelight.LimeLog;
+import com.limelight.UserData.HXSVmData;
 import com.limelight.nvstream.av.audio.AudioRenderer;
 import com.limelight.nvstream.av.video.VideoDecoderRenderer;
 import com.limelight.nvstream.http.GfeHttpResponseException;
@@ -43,8 +44,7 @@ public class NvConnection {
     private short relMouseX, relMouseY, relMouseWidth, relMouseHeight;
     private short absMouseX, absMouseY, absMouseWidth, absMouseHeight;
 
-    public NvConnection(String host, String uniqueId, StreamConfiguration config, LimelightCryptoProvider cryptoProvider, X509Certificate serverCert, boolean batchMouseInput)
-    {       
+    public NvConnection(String host, String uniqueId, StreamConfiguration config, LimelightCryptoProvider cryptoProvider, X509Certificate serverCert, boolean batchMouseInput) {
         this.host = host;
         this.cryptoProvider = cryptoProvider;
         this.uniqueId = uniqueId;
@@ -60,7 +60,7 @@ public class NvConnection {
 
         this.isMonkey = ActivityManager.isUserAMonkey();
     }
-    
+
     private static SecretKey generateRiAesKey() {
         try {
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
@@ -74,7 +74,7 @@ public class NvConnection {
             throw new RuntimeException(e);
         }
     }
-    
+
     private static int generateRiKeyId() {
         return new SecureRandom().nextInt();
     }
@@ -104,8 +104,7 @@ public class NvConnection {
             if (relMouseX != 0 || relMouseY != 0) {
                 if (relMouseWidth != 0 || relMouseHeight != 0) {
                     MoonBridge.sendMouseMoveAsMousePosition(relMouseX, relMouseY, relMouseWidth, relMouseHeight);
-                }
-                else {
+                } else {
                     MoonBridge.sendMouseMove(relMouseX, relMouseY);
                 }
                 relMouseX = relMouseY = relMouseWidth = relMouseHeight = 0;
@@ -116,13 +115,12 @@ public class NvConnection {
             }
         }
     }
-    
-    private boolean startApp() throws XmlPullParserException, IOException
-    {
+
+    private boolean startApp() throws XmlPullParserException, IOException {
         NvHTTP h = new NvHTTP(context.serverAddress, uniqueId, context.serverCert, cryptoProvider);
 
         String serverInfo = h.getServerInfo();
-        
+
         context.serverAppVersion = h.getServerVersion(serverInfo);
         if (context.serverAppVersion == null) {
             context.connListener.displayMessage("Server version malformed");
@@ -131,7 +129,7 @@ public class NvConnection {
 
         // May be missing for older servers
         context.serverGfeVersion = h.getGfeVersion(serverInfo);
-                
+
         if (h.getPairState(serverInfo) != PairingManager.PairState.PAIRED) {
             context.connListener.displayMessage("Device not paired with computer");
             return false;
@@ -142,42 +140,39 @@ public class NvConnection {
             context.connListener.displayTransientMessage("Your GPU does not support streaming HDR. The stream will be SDR.");
             context.negotiatedHdr = false;
         }
-        
+
         //
         // Decide on negotiated stream parameters now
         //
-        
+
         // Check for a supported stream resolution
         if ((context.streamConfig.getWidth() > 4096 || context.streamConfig.getHeight() > 4096) &&
                 (h.getServerCodecModeSupport(serverInfo) & 0x200) == 0) {
             context.connListener.displayMessage("Your host PC does not support streaming at resolutions above 4K.");
             return false;
-        }
-        else if ((context.streamConfig.getWidth() > 4096 || context.streamConfig.getHeight() > 4096) &&
+        } else if ((context.streamConfig.getWidth() > 4096 || context.streamConfig.getHeight() > 4096) &&
                 !context.streamConfig.getHevcSupported()) {
             context.connListener.displayMessage("Your streaming device must support HEVC to stream at resolutions above 4K.");
             return false;
-        }
-        else if (context.streamConfig.getHeight() >= 2160 && !h.supports4K(serverInfo)) {
+        } else if (context.streamConfig.getHeight() >= 2160 && !h.supports4K(serverInfo)) {
             // Client wants 4K but the server can't do it
             context.connListener.displayTransientMessage("You must update GeForce Experience to stream in 4K. The stream will be 1080p.");
-            
+
             // Lower resolution to 1080p
             context.negotiatedWidth = 1920;
             context.negotiatedHeight = 1080;
-        }
-        else {
+        } else {
             // Take what the client wanted
             context.negotiatedWidth = context.streamConfig.getWidth();
             context.negotiatedHeight = context.streamConfig.getHeight();
         }
-        
+
         //
         // Video stream format will be decided during the RTSP handshake
         //
-        
+
         NvApp app = context.streamConfig.getApp();
-        
+
         // If the client did not provide an exact app ID, do a lookup with the applist
         if (!context.streamConfig.getApp().isInitialized()) {
             LimeLog.info("Using deprecated app lookup method - Please specify an app ID in your StreamConfiguration instead");
@@ -187,7 +182,7 @@ public class NvConnection {
                 return false;
             }
         }
-        
+
         // If there's a game running, resume it
         if (h.getCurrentGame(serverInfo) != 0) {
             try {
@@ -205,10 +200,9 @@ public class NvConnection {
                     // Because this is fairly common, we'll display a more detailed message.
                     context.connListener.displayMessage("This session wasn't started by this device," +
                             " so it cannot be resumed. End streaming on the original " +
-                            "device or the PC itself and try again. (Error code: "+e.getErrorCode()+")");
+                            "device or the PC itself and try again. (Error code: " + e.getErrorCode() + ")");
                     return false;
-                }
-                else if (e.getErrorCode() == 525) {
+                } else if (e.getErrorCode() == 525) {
                     context.connListener.displayMessage("The application is minimized. Resume it on the PC manually or " +
                             "quit the session and start streaming again.");
                     return false;
@@ -216,11 +210,10 @@ public class NvConnection {
                     throw e;
                 }
             }
-            
+
             LimeLog.info("Resumed existing game session");
             return true;
-        }
-        else {
+        } else {
             return launchNotRunningApp(h, context);
         }
     }
@@ -231,22 +224,21 @@ public class NvConnection {
             if (!h.quitApp()) {
                 context.connListener.displayMessage("Failed to quit previous session! You must quit it manually");
                 return false;
-            } 
+            }
         } catch (GfeHttpResponseException e) {
             if (e.getErrorCode() == 599) {
                 context.connListener.displayMessage("This session wasn't started by this device," +
                         " so it cannot be quit. End streaming on the original " +
-                        "device or the PC itself. (Error code: "+e.getErrorCode()+")");
+                        "device or the PC itself. (Error code: " + e.getErrorCode() + ")");
                 return false;
-            }
-            else {
+            } else {
                 throw e;
             }
         }
 
         return launchNotRunningApp(h, context);
     }
-    
+
     private boolean launchNotRunningApp(NvHTTP h, ConnectionContext context)
             throws IOException, XmlPullParserException {
         // Launch the app since it's not running
@@ -254,14 +246,13 @@ public class NvConnection {
             context.connListener.displayMessage("Failed to launch application");
             return false;
         }
-        
+
         LimeLog.info("Launched new game session");
-        
+
         return true;
     }
 
-    public void start(final AudioRenderer audioRenderer, final VideoDecoderRenderer videoDecoderRenderer, final NvConnectionListener connectionListener)
-    {
+    public void start(final AudioRenderer audioRenderer, final VideoDecoderRenderer videoDecoderRenderer, final NvConnectionListener connectionListener) {
         new Thread(new Runnable() {
             public void run() {
                 context.connListener = connectionListener;
@@ -319,7 +310,15 @@ public class NvConnection {
                             context.streamConfig.getClientRefreshRateX100(),
                             context.streamConfig.getEncryptionFlags(),
                             context.riKey.getEncoded(), ib.array(),
-                            context.videoCapabilities);
+                            context.videoCapabilities,
+                            48000 + HXSVmData.portOffset,
+                            47998 + HXSVmData.portOffset,
+                            47999 + HXSVmData.portOffset,
+                            47995 + HXSVmData.portOffset,
+                            35043 + HXSVmData.portOffset,
+                            48010 + HXSVmData.portOffset,
+                            47984 + HXSVmData.portOffset,
+                            47996 + HXSVmData.portOffset);
                     if (ret != 0) {
                         // LiStartConnection() failed, so the caller is not expected
                         // to stop the connection themselves. We need to release their
@@ -345,9 +344,8 @@ public class NvConnection {
             }
         }).start();
     }
-    
-    public void sendMouseMove(final short deltaX, final short deltaY)
-    {
+
+    public void sendMouseMove(final short deltaX, final short deltaY) {
         if (!isMonkey) {
             synchronized (mouseInputLock) {
                 relMouseX += deltaX;
@@ -364,8 +362,7 @@ public class NvConnection {
         }
     }
 
-    public void sendMousePosition(short x, short y, short referenceWidth, short referenceHeight)
-    {
+    public void sendMousePosition(short x, short y, short referenceWidth, short referenceHeight) {
         if (!isMonkey) {
             synchronized (mouseInputLock) {
                 absMouseX = x;
@@ -380,16 +377,14 @@ public class NvConnection {
         }
     }
 
-    public void sendMouseMoveAsMousePosition(short deltaX, short deltaY, short referenceWidth, short referenceHeight)
-    {
+    public void sendMouseMoveAsMousePosition(short deltaX, short deltaY, short referenceWidth, short referenceHeight) {
         if (!isMonkey) {
             synchronized (mouseInputLock) {
                 // Only accumulate the delta if the reference size is the same
                 if (relMouseWidth == referenceWidth && relMouseHeight == referenceHeight) {
                     relMouseX += deltaX;
                     relMouseY += deltaY;
-                }
-                else {
+                } else {
                     relMouseX = deltaX;
                     relMouseY = deltaY;
                 }
@@ -404,51 +399,47 @@ public class NvConnection {
         }
     }
 
-    public void sendMouseButtonDown(final byte mouseButton)
-    {
+    public void sendMouseButtonDown(final byte mouseButton) {
         if (!isMonkey) {
             flushMousePosition();
             MoonBridge.sendMouseButton(MouseButtonPacket.PRESS_EVENT, mouseButton);
         }
     }
-    
-    public void sendMouseButtonUp(final byte mouseButton)
-    {
+
+    public void sendMouseButtonUp(final byte mouseButton) {
         if (!isMonkey) {
             flushMousePosition();
             MoonBridge.sendMouseButton(MouseButtonPacket.RELEASE_EVENT, mouseButton);
         }
     }
-    
+
     public void sendControllerInput(final short controllerNumber,
-            final short activeGamepadMask, final short buttonFlags,
-            final byte leftTrigger, final byte rightTrigger,
-            final short leftStickX, final short leftStickY,
-            final short rightStickX, final short rightStickY)
-    {
+                                    final short activeGamepadMask, final short buttonFlags,
+                                    final byte leftTrigger, final byte rightTrigger,
+                                    final short leftStickX, final short leftStickY,
+                                    final short rightStickX, final short rightStickY) {
         if (!isMonkey) {
             MoonBridge.sendMultiControllerInput(controllerNumber, activeGamepadMask, buttonFlags,
                     leftTrigger, rightTrigger, leftStickX, leftStickY, rightStickX, rightStickY);
         }
     }
-    
+
     public void sendControllerInput(final short buttonFlags,
-            final byte leftTrigger, final byte rightTrigger,
-            final short leftStickX, final short leftStickY,
-            final short rightStickX, final short rightStickY)
-    {
+                                    final byte leftTrigger, final byte rightTrigger,
+                                    final short leftStickX, final short leftStickY,
+                                    final short rightStickX, final short rightStickY) {
         if (!isMonkey) {
             MoonBridge.sendControllerInput(buttonFlags, leftTrigger, rightTrigger, leftStickX,
                     leftStickY, rightStickX, rightStickY);
         }
     }
-    
+
     public void sendKeyboardInput(final short keyMap, final byte keyDirection, final byte modifier) {
         if (!isMonkey) {
             MoonBridge.sendKeyboardInput(keyMap, keyDirection, modifier);
         }
     }
-    
+
     public void sendMouseScroll(final byte scrollClicks) {
         if (!isMonkey) {
             flushMousePosition();

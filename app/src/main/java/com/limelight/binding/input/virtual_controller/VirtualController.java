@@ -55,7 +55,6 @@ public class VirtualController {
     ControllerMode currentMode = ControllerMode.Active;
     ControllerInputContext inputContext = new ControllerInputContext();
 
-    private Button buttonConfigure = null;
 
     private List<VirtualControllerElement> elements = new ArrayList<>();
 
@@ -64,37 +63,6 @@ public class VirtualController {
         this.frame_layout = layout;
         this.context = context;
         this.handler = new Handler(Looper.getMainLooper());
-
-        buttonConfigure = new Button(context);
-        buttonConfigure.setAlpha(0.25f);
-        buttonConfigure.setFocusable(false);
-        buttonConfigure.setBackgroundResource(R.drawable.ic_settings);
-        buttonConfigure.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String message;
-
-                if (currentMode == ControllerMode.Active){
-                    currentMode = ControllerMode.MoveButtons;
-                    message = "Entering configuration mode (Move buttons)";
-                } else if (currentMode == ControllerMode.MoveButtons) {
-                    currentMode = ControllerMode.ResizeButtons;
-                    message = "Entering configuration mode (Resize buttons)";
-                } else {
-                    currentMode = ControllerMode.Active;
-                    VirtualControllerConfigurationLoader.saveProfile(VirtualController.this, context);
-                    message = "Exiting configuration mode";
-                }
-
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-
-                buttonConfigure.invalidate();
-
-                for (VirtualControllerElement element : elements) {
-                    element.invalidate();
-                }
-            }
-        });
 
     }
 
@@ -107,7 +75,6 @@ public class VirtualController {
             element.setVisibility(View.INVISIBLE);
         }
 
-        buttonConfigure.setVisibility(View.INVISIBLE);
     }
 
     public void show() {
@@ -115,7 +82,6 @@ public class VirtualController {
             element.setVisibility(View.VISIBLE);
         }
 
-        buttonConfigure.setVisibility(View.VISIBLE);
     }
 
     public void removeElements() {
@@ -124,7 +90,6 @@ public class VirtualController {
         }
         elements.clear();
 
-        frame_layout.removeView(buttonConfigure);
     }
 
     public void setOpacity(int opacity) {
@@ -157,11 +122,10 @@ public class VirtualController {
 
         DisplayMetrics screen = context.getResources().getDisplayMetrics();
 
-        int buttonSize = (int)(screen.heightPixels*0.06f);
+        int buttonSize = (int) (screen.heightPixels * 0.06f);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(buttonSize, buttonSize);
         params.leftMargin = 15;
         params.topMargin = 15;
-        frame_layout.addView(buttonConfigure, params);
 
         // Start with the default layout
         VirtualControllerConfigurationLoader.createDefaultLayout(this, context);
@@ -211,5 +175,15 @@ public class VirtualController {
         handler.postDelayed(delayedRetransmitRunnable, 25);
         handler.postDelayed(delayedRetransmitRunnable, 50);
         handler.postDelayed(delayedRetransmitRunnable, 75);
+    }
+
+    public void setAlpha(int alpha) {
+        for (VirtualControllerElement element : elements) {
+            element.setAlpha(alpha);
+        }
+    }
+
+    public void setCurrentMode(ControllerMode currentMode) {
+        this.currentMode = currentMode;
     }
 }

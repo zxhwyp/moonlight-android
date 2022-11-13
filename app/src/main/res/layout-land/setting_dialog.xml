@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_centerInParent="true"
+    android:background="#aa24314C"
+    tools:ignore="MissingDefaultResource">
+
+    <TextView
+        android:id="@+id/tv_balance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="海星点：10  赠点：10"
+        android:layout_marginLeft="27dp"
+        android:textColor="#FFFFFF"
+        android:textSize="29dp" />
+
+    <View
+        android:id="@+id/view_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="63dp"
+        android:background="#15D8D8D8" />
+
+    <View
+        android:id="@+id/view_underline"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_below="@+id/view_title_bar"
+        android:background="@drawable/hxs_shape_light_line" />
+
+    <LinearLayout
+        android:id="@+id/ll_selection_list"
+        android:layout_width="190dp"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/view_underline"
+        android:background="#10D8D8D8"
+        android:orientation="vertical">
+
+        <com.limelight.ui.view.HXSItemSetting
+            android:id="@+id/item_setting"
+            android:layout_width="match_parent"
+            android:layout_height="121dp" />
+
+        <com.limelight.ui.view.HXSItemSetting
+            android:id="@+id/item_feedback"
+            android:layout_width="match_parent"
+            android:layout_height="121dp" />
+    </LinearLayout>
+
+    <com.limelight.ui.view.HXSItemSetting
+        android:id="@+id/setting_group"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/view_underline"
+        android:layout_toRightOf="@+id/ll_selection_list" />
+    <com.limelight.ui.view.HXSFeedbackGroup
+        android:id="@+id/feedback_group"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/view_underline"
+        android:layout_toRightOf="@+id/ll_selection_list"
+        android:visibility="gone"/>
+
+    <ImageView
+        android:id="@+id/iv_close"
+        android:layout_width="63dp"
+        android:layout_height="63dp"
+        android:layout_alignParentRight="true"
+        android:src="@mipmap/ic_x"
+        android:padding="15dp"
+        />
+</RelativeLayout>

@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#00000000">
+
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="97dp"
+            android:layout_marginTop="55dp"
+            android:background="@drawable/shape_yellow_round" />
+
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="97dp"
+            android:layout_marginTop="249dp"
+            android:background="@drawable/shape_yellow_round" />
+
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="97dp"
+            android:layout_marginTop="369dp"
+            android:background="@drawable/shape_yellow_round" />
+
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="97dp"
+            android:layout_marginTop="471dp"
+            android:background="@drawable/shape_yellow_round" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="138dp"
+            android:layout_marginTop="43dp"
+            android:text="鼠标模式"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="138dp"
+            android:layout_marginTop="236dp"
+            android:text="显示游戏按键"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="138dp"
+            android:layout_marginTop="356dp"
+            android:text="按键透明度"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="138dp"
+            android:layout_marginTop="458dp"
+            android:text="鼠标灵敏度"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <TextView
+            android:id="@+id/tv_handle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="140dp"
+            android:layout_marginTop="112dp"
+            android:background="@drawable/bg_mouse_selected"
+            android:paddingHorizontal="28dp"
+            android:paddingVertical="21dp"
+            android:text="手势滑屏"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <ImageView
+            android:id="@+id/iv_mouse_help"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginLeft="350dp"
+            android:layout_marginTop="128dp"
+            android:src="@mipmap/ic_mouse_help" />
+
+        <ImageView
+            android:id="@+id/iv_touch_help"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginLeft="670dp"
+            android:layout_marginTop="128dp"
+            android:src="@mipmap/ic_mouse_help" />
+
+        <TextView
+            android:id="@+id/tv_abs_control"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="485dp"
+            android:layout_marginTop="109dp"
+            android:background="@drawable/bg_mouse_selected"
+            android:paddingHorizontal="28dp"
+            android:paddingVertical="21dp"
+            android:text="触屏控制"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp"
+            android:visibility="visible" />
+
+        <TextView
+            android:id="@+id/tv_disable_handle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="720dp"
+            android:layout_marginTop="109dp"
+            android:background="@drawable/bg_mouse_selected"
+            android:paddingHorizontal="28dp"
+            android:paddingVertical="21dp"
+            android:text="禁用鼠标"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp"
+            android:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/tv_advanced_controller"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignLeft="@+id/tv_abs_control"
+            android:layout_alignRight="@+id/tv_abs_control"
+            android:layout_marginTop="223dp"
+            android:background="@drawable/bg_controller_setting"
+            android:orientation="horizontal"
+            android:textColor="#FFFFFF"
+
+            >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingVertical="20dp"
+                android:paddingLeft="27dp"
+                android:text="自定义"
+                android:textColor="#000000"
+                android:textSize="31dp" />
+
+            <ImageView
+                android:layout_width="27dp"
+                android:layout_height="27dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="8dp"
+                android:layout_marginRight="27dp"
+                android:src="@mipmap/ic_controller_setting" />
+        </LinearLayout>
+
+        <com.limelight.ui.view.HXSSwitchView
+            android:id="@+id/switch_controller"
+            android:layout_width="79dp"
+            android:layout_height="48dp"
+            android:layout_marginLeft="350dp"
+            android:layout_marginTop="237dp"
+            app:color_off="#449F9F9F" />
+
+        <SeekBar
+            android:id="@+id/seekbar_alpha"
+            android:layout_width="447dp"
+            android:layout_height="36dp"
+            android:layout_marginLeft="317dp"
+            android:layout_marginTop="360dp"
+            android:max="50"
+            android:min="20"
+            android:progressDrawable="@drawable/seekbar_progress_drawable"
+            android:thumb="@drawable/tump_image" />
+
+        <TextView
+            android:id="@+id/tv_alpha"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignTop="@+id/seekbar_alpha"
+            android:layout_marginLeft="29dp"
+            android:layout_toRightOf="@id/seekbar_alpha"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <SeekBar
+            android:id="@+id/seekbar_mouse"
+            android:layout_width="447dp"
+            android:layout_height="36dp"
+            android:layout_marginLeft="317dp"
+            android:layout_marginTop="462dp"
+            android:max="25"
+            android:min="1"
+            android:progressDrawable="@drawable/seekbar_progress_drawable"
+            android:thumb="@drawable/tump_image" />
+
+        <TextView
+            android:id="@+id/tv_mouse_speed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignTop="@+id/seekbar_mouse"
+            android:layout_marginLeft="29dp"
+            android:layout_toRightOf="@+id/seekbar_mouse"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="97dp"
+            android:layout_marginTop="550dp"
+            android:background="@drawable/shape_yellow_round" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="140dp"
+            android:layout_marginTop="538dp"
+            android:text="开启麦克风"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <com.limelight.ui.view.HXSSwitchView
+            android:id="@+id/switch_mic_phone"
+            android:layout_width="79dp"
+            android:layout_height="48dp"
+            android:layout_marginLeft="350dp"
+            android:layout_marginTop="540dp"
+            app:color_off="#449F9F9F" />
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="97dp"
+            android:layout_marginTop="630dp"
+            android:background="@drawable/shape_yellow_round" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="140dp"
+            android:layout_marginTop="618dp"
+            android:text="使用系统键盘"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+
+        <com.limelight.ui.view.HXSSwitchView
+            android:id="@+id/switch_use_source_keyboard"
+            android:layout_width="79dp"
+            android:layout_height="48dp"
+            android:layout_marginLeft="350dp"
+            android:layout_marginTop="620dp"
+            app:color_off="#449F9F9F" />
+        <View
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_marginLeft="500dp"
+            android:layout_marginTop="550dp"
+            android:background="@drawable/shape_yellow_round" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="540dp"
+            android:layout_marginTop="538dp"
+            android:text="全屏视角拖动"
+            android:textColor="#FFFFFF"
+            android:textSize="31dp" />
+        <com.limelight.ui.view.HXSSwitchView
+            android:id="@+id/switch_open_rs"
+            android:layout_width="79dp"
+            android:layout_height="48dp"
+            android:layout_marginLeft="750dp"
+            android:layout_marginTop="540dp"
+            app:color_off="#449F9F9F"
+            />
+    </RelativeLayout>
+</ScrollView>

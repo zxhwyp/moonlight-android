@@ -1463,6 +1463,26 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
         }
     }
 
+    //custom combo " Star+UP "
+    public boolean isStartKeyupCombo(KeyEvent event) {
+        boolean result = false;
+        InputDeviceContext context = getContextForEvent(event);
+        if ((context.inputMap & ControllerPacket.PLAY_FLAG) != 0 && (context.inputMap & ControllerPacket.UP_FLAG) != 0) {
+            result = true;
+        }
+        return result;
+    }
+    //custom combo " RB+LB+UP "
+    public boolean isRbLbUpCombo(KeyEvent event) {
+        boolean result = false;
+        InputDeviceContext context = getContextForEvent(event);
+        if ((context.inputMap & ControllerPacket.RB_FLAG) != 0 && (context.inputMap & ControllerPacket.UP_FLAG) != 0 &&
+                (context.inputMap & ControllerPacket.LB_FLAG) != 0){
+            result = true;
+        }
+        return result;
+    }
+
     public boolean handleButtonUp(KeyEvent event) {
         InputDeviceContext context = getContextForEvent(event);
         if (context == null) {

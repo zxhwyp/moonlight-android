@@ -8,7 +8,10 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
+
+import com.limelight.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +72,12 @@ public class AnalogStick extends VirtualControllerElement {
          */
         void onRevoke();
     }
+
+    private int iconBackground = R.mipmap.ic_analog_stick;
+    private int iconButtonLeft = R.mipmap.ic_stick_button_left;
+    private int iconButtonSelectedLeft = R.mipmap.ic_stick_button_left_pressed;
+    private int alpha = 255;
+
 
     /**
      * Movement states of the analog sick.
@@ -167,8 +176,8 @@ public class AnalogStick extends VirtualControllerElement {
     public AnalogStick(VirtualController controller, Context context, int elementId) {
         super(controller, context, elementId);
         // reset stick position
-        position_stick_x = getWidth() / 2;
-        position_stick_y = getHeight() / 2;
+        position_stick_x = getWidth() * 3 / 4;
+        position_stick_y = getHeight() * 3 / 4;
     }
 
     public void addAnalogStickListener(AnalogStickListener listener) {
@@ -210,12 +219,17 @@ public class AnalogStick extends VirtualControllerElement {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         // calculate new radius sizes depending
-        radius_complete = getPercent(getCorrectWidth() / 2, 100) - 2 * getDefaultStrokeWidth();
+        radius_complete = getPercent(getCorrectWidth() / 2, 100);
         radius_dead_zone = getPercent(getCorrectWidth() / 2, 30);
         radius_analog_stick = getPercent(getCorrectWidth() / 2, 20);
 
         super.onSizeChanged(w, h, oldw, oldh);
     }
+
+    public void setIconBackground(int icon) {
+        this.iconBackground = icon;
+    }
+
 
     @Override
     protected void onElementDraw(Canvas canvas) {
@@ -231,26 +245,56 @@ public class AnalogStick extends VirtualControllerElement {
         } else {
             paint.setColor(pressedColor);
         }
-        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_complete, paint);
-
+        if (iconBackground < 0) {
+            canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_complete, paint);
+        } else {
+            Drawable d = getResources().getDrawable(iconBackground);
+            d.setBounds(0, 0, getWidth(), getHeight());
+            d.setAlpha(alpha);
+            d.draw(canvas);
+        }
         paint.setColor(getDefaultColor());
         // draw dead zone
-        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
+        // canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
 
         // draw stick depending on state
         switch (stick_state) {
             case NO_MOVEMENT: {
                 paint.setColor(getDefaultColor());
-                canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_analog_stick, paint);
+                if (iconButtonLeft < 0) {
+                    canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_analog_stick, paint);
+                } else {
+                    Drawable d = getResources().getDrawable(iconButtonLeft);
+                    d.setBounds(getWidth() / 2 - getWidth() / 4, getHeight() / 2 - getHeight() / 4, getWidth() / 2 + getWidth() / 4, getHeight() / 2 + getHeight() / 4);
+                    d.setAlpha(alpha);
+                    d.draw(canvas);
+                }
                 break;
             }
             case MOVED_IN_DEAD_ZONE:
             case MOVED_ACTIVE: {
                 paint.setColor(pressedColor);
-                canvas.drawCircle(position_stick_x, position_stick_y, radius_analog_stick, paint);
+                if (iconButtonSelectedLeft < 0) {
+                    canvas.drawCircle(position_stick_x, position_stick_y, radius_analog_stick, paint);
+                } else {
+                    float length = (float) (Math.pow((position_stick_x - (float) getWidth() / 2), 2) + (Math.pow((position_stick_y - (float) getWidth() / 2), 2)));
+                    float limitLength = (float) getWidth() * (float) getWidth() / 16;
+                    if (length > limitLength) {
+                        position_stick_y = (float)getWidth()/2 + (float) ((position_stick_y - (float) getWidth() / 2) * Math.sqrt(limitLength) / Math.sqrt(length));
+                        position_stick_x = (float)getWidth()/2 + (float) ((position_stick_x - (float) getWidth() / 2) * Math.sqrt(limitLength) / Math.sqrt(length));
+                    }
+                    Drawable d = getResources().getDrawable(iconButtonSelectedLeft);
+                    d.setBounds((int) position_stick_x - getWidth() / 4, (int) position_stick_y - getHeight() / 4, (int) position_stick_x + getWidth() / 4, (int) position_stick_y + getHeight() / 4);
+                    d.draw(canvas);
+                }
                 break;
             }
         }
+    }
+
+    public void setAlpha(int alpha) {
+        this.alpha = alpha;
+        invalidate();
     }
 
     private void updatePosition(long eventTime) {
@@ -297,8 +341,12 @@ public class AnalogStick extends VirtualControllerElement {
         if (movement_radius > radius_complete && !isPressed())
             return false;
 
-        // chop radius if out of outer circle or near the edge
+        // chop radius if out of outer circle and already pressed
         if (movement_radius > (radius_complete - radius_analog_stick)) {
+            // not pressed already, so ignore event from outer circle
+            if (!isPressed()) {
+                return false;
+            }
             movement_radius = radius_complete - radius_analog_stick;
         }
 
@@ -329,6 +377,8 @@ public class AnalogStick extends VirtualControllerElement {
                 setPressed(false);
                 break;
             }
+            case MotionEvent.ACTION_POINTER_UP:
+                break;
         }
 
         if (isPressed()) {

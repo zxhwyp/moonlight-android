@@ -1,5 +1,6 @@
 package com.limelight.computers;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
@@ -13,7 +14,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.limelight.AppView;
+import com.limelight.HXSLog;
+import com.limelight.Infrastructure.httpUtils.HXSHttpRequestCenter;
 import com.limelight.LimeLog;
+import com.limelight.UserData.HXSVmData;
 import com.limelight.binding.PlatformBinding;
 import com.limelight.discovery.DiscoveryService;
 import com.limelight.nvstream.NvConnection;
@@ -23,6 +28,7 @@ import com.limelight.nvstream.http.NvHTTP;
 import com.limelight.nvstream.http.PairingManager;
 import com.limelight.nvstream.mdns.MdnsComputer;
 import com.limelight.nvstream.mdns.MdnsDiscoveryListener;
+import com.hxstream.operation.HXSConnection;
 import com.limelight.utils.CacheHelper;
 import com.limelight.utils.NetHelper;
 import com.limelight.utils.ServerHelper;
@@ -37,10 +43,13 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
 
 import org.xmlpull.v1.XmlPullParserException;
+
+import static java.lang.Thread.sleep;
 
 public class ComputerManagerService extends Service {
     private static final int SERVERINFO_POLLING_PERIOD_MS = 1500;
@@ -51,6 +60,16 @@ public class ComputerManagerService extends Service {
     private static final int INITIAL_POLL_TRIES = 2;
     private static final int EMPTY_LIST_THRESHOLD = 3;
     private static final int POLL_DATA_TTL_MS = 30000;
+
+    private Handler handler = new Handler();
+
+    public static String serverCertString = "";
+    public static boolean BooleanResume = false;
+    private AppView.AppObject app = null;
+
+    ComputerManagerService.ApplistPoller poller;
+
+    private int retryTimes = 0;
 
     private final ComputerManagerBinder binder = new ComputerManagerBinder();
 
@@ -68,7 +87,7 @@ public class ComputerManagerService extends Service {
     private final ServiceConnection discoveryServiceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             synchronized (discoveryServiceConnection) {
-                DiscoveryService.DiscoveryBinder privateBinder = ((DiscoveryService.DiscoveryBinder)binder);
+                DiscoveryService.DiscoveryBinder privateBinder = ((DiscoveryService.DiscoveryBinder) binder);
 
                 // Set us as the event listener
                 privateBinder.setListener(createDiscoveryListener());
@@ -132,8 +151,7 @@ public class ComputerManagerService extends Service {
             if (existingComputer != null) {
                 existingComputer.update(details);
                 dbManager.updateComputer(existingComputer);
-            }
-            else {
+            } else {
                 try {
                     // If the active address is a site-local address (RFC 1918),
                     // then use STUN to populate the external address field if
@@ -144,7 +162,8 @@ public class ComputerManagerService extends Service {
                             populateExternalAddress(details);
                         }
                     }
-                } catch (UnknownHostException ignored) {}
+                } catch (UnknownHostException ignored) {
+                }
 
                 dbManager.updateComputer(details);
             }
@@ -206,7 +225,7 @@ public class ComputerManagerService extends Service {
                 for (PollingTuple tuple : pollingTuples) {
                     // Enforce the poll data TTL
                     if (SystemClock.elapsedRealtime() - tuple.lastSuccessfulPollMs > POLL_DATA_TTL_MS) {
-                        LimeLog.info("Timing out polled state for "+tuple.computer.name);
+                        LimeLog.info("Timing out polled state for " + tuple.computer.name);
                         tuple.computer.state = ComputerDetails.State.UNKNOWN;
                     }
 
@@ -274,6 +293,176 @@ public class ComputerManagerService extends Service {
 
         public String getUniqueId() {
             return idManager.getUniqueId();
+        }
+
+        private void doPair(final ComputerDetails computer) {
+            try {
+                if (computer.state == ComputerDetails.State.OFFLINE ||
+                        ServerHelper.getCurrentAddressFromComputer(computer) == null) {
+                    return;
+                }
+            } catch (IOException e) {
+                return;
+            }
+            if (computer.runningGameId != 0) {
+                HXSLog.info(" 当前海星云游戏正在游戏中，你必须在配对之前先退出游戏 ");
+                //            --state--连接失败 dopair
+                return;
+            }
+            HXSLog.info(" 尝试与海星云游戏建立连接…… ");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    NvHTTP httpConn;
+                    String message;
+                    boolean success = false;
+                    try {
+                        HXSLog.info("配对------");
+                        String uniqueId = idManager.getUniqueId();
+                        httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
+                                uniqueId,
+                                computer.serverCert,
+                                PlatformBinding.getCryptoProvider(ComputerManagerService.this));
+                        PairingManager.PairState pairstate = httpConn.getPairState();
+                        HXSLog.info(pairstate.toString() + "----------------0");
+                        if (pairstate == PairingManager.PairState.PAIRED) {
+                            // Don't display any toast, but open the app list
+                            message = null;
+                            success = true;
+                        } else {
+                            final String pinStr = PairingManager.generatePinString();
+                            requestPair(computer, pinStr);
+                            PairingManager pm = httpConn.getPairingManager();
+                            PairingManager.PairState pairState = pm.pair(httpConn.getServerInfo(), pinStr);
+                            serverCertString = pm.getPairedCertString();
+                            HXSLog.info("serverCertstring:" + serverCertString);
+
+                            HXSLog.info(pairState.toString() + "----------2");
+                            if (pairState == PairingManager.PairState.PIN_WRONG) {
+                                message = " 尝试连接错误，请点击重试或重新连接 ";
+                            } else if (pairState == PairingManager.PairState.FAILED) {
+                                message = " 尝试连接错误，请点击重试或重新连接 ";
+                            } else if (pairState == PairingManager.PairState.ALREADY_IN_PROGRESS) {
+                                message = " 已经在建立连接，请稍等 ";
+                            } else if (pairState == PairingManager.PairState.PAIRED) {
+                                // Just navigate to the app view without displaying a toast
+                                message = null;
+                                success = true;
+                                // Pin this certificate for later HTTPS use
+                                try {
+                                    getComputer(computer.uuid).serverCert = pm.getPairedCert();
+                                } catch (Exception e) {
+                                    HXSLog.info(e.toString());
+                                }
+                                // Invalidate reachability information after pairing to force
+                                // a refresh before reading pair state again
+                                invalidateStateForComputer(computer.uuid);
+                                try {
+                                    pollComputer(computer);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            } else {
+                                // Should be no other values
+
+                                message = null;
+                            }
+                        }
+                    } catch (UnknownHostException e) {
+                        message = " 解析海星云地址错误 ";
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateConnectFail);
+                                HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateConnectFail);
+
+                            }
+                        });
+                    } catch (FileNotFoundException e) {
+                        message = " 海星云走神了，换台机器吧 ";
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateConnectFail);
+                                HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateConnectFail);
+
+                            }
+                        });
+                        //GeForce Experience返回了HTTP 404 错误。确保你的显卡支持GAMESTREAM\n\n
+                        //	    使用远程控制软件同样会引起此错误，请尝试重启电脑或者重新安装GeForce Experience
+                    } catch (XmlPullParserException | IOException e) {
+                        e.printStackTrace();
+                        message = e.getMessage();
+                    }
+
+                    final String toastMessage = message;
+                    final boolean toastSuccess = success;
+                    HXSLog.info("配对提示消息：" + toastMessage);
+                    if (toastSuccess) {
+                        // Open the app list after a successful pairing attempt
+                        if (computer.state == ComputerDetails.State.ONLINE) {
+                            HXSLog.info("computer 在线");
+                        }
+                        if (computer.state == ComputerDetails.State.UNKNOWN) {
+                            HXSLog.info("computer 未知");
+                        }
+                        if (computer.state == ComputerDetails.State.OFFLINE) {
+                            HXSLog.info("computer 离线");
+                        }
+
+                        doAppList(computer);
+                    } else {
+                        // Start polling again if we're still in the foreground
+                        retryTimes++;
+                        if (retryTimes > 3) {
+                            handler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateConnectFail);
+                                    HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateConnectFail);
+
+                                }
+                            });
+                            return;
+                        }
+                        try {
+                            sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        doPair(computer);
+
+                    }
+                }
+            }).start();
+        }
+
+
+        public void doAppList(ComputerDetails computer) {
+            if (computer.state == ComputerDetails.State.OFFLINE) {
+                //                --state--连接失败--海星云离线
+                HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateConnectFail);
+                HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateConnectFail);
+                return;
+            }
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    HXSConnection.getInstance().getCallback().updateConnectionState(HXSConnection.ConnectionStatus.StateConnectSuccess);
+                    HXSVmData.setConnectionStatus(HXSConnection.ConnectionStatus.StateConnectSuccess);
+                }
+            });
+            poller = new ApplistPoller(computer);
+            poller.start();
+        }
+
+        private void requestPair(ComputerDetails computer, String pinStr) {
+            HXSHttpRequestCenter.requestPair(pinStr, new HXSHttpRequestCenter.IOnRequestCompletionDataReturn() {
+                @Override
+                public void returnAnalysis(String result) {
+                    HXSLog.info("pairResult" + result);
+                }
+            });
         }
 
         public ComputerDetails getComputer(String uuid) {
@@ -356,8 +545,7 @@ public class ComputerManagerService extends Service {
                                     boundToNetwork = true;
                                     break;
                                 }
-                            }
-                            else if (ConnectivityManager.setProcessDefaultNetwork(net)) {
+                            } else if (ConnectivityManager.setProcessDefaultNetwork(net)) {
                                 boundToNetwork = true;
                                 break;
                             }
@@ -376,8 +564,7 @@ public class ComputerManagerService extends Service {
         if (boundToNetwork) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 connMgr.bindProcessToNetwork(null);
-            }
-            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 ConnectivityManager.setProcessDefaultNetwork(null);
             }
         }
@@ -412,7 +599,7 @@ public class ComputerManagerService extends Service {
                 try {
                     // Kick off a blocking serverinfo poll on this machine
                     if (!addComputerBlocking(details)) {
-                        LimeLog.warning("Auto-discovered PC failed to respond: "+details);
+                        LimeLog.warning("Auto-discovered PC failed to respond: " + details);
                     }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -491,13 +678,12 @@ public class ComputerManagerService extends Service {
 
         // If the machine is reachable, it was successful
         if (fakeDetails.state == ComputerDetails.State.ONLINE) {
-            LimeLog.info("New PC ("+fakeDetails.name+") is UUID "+fakeDetails.uuid);
+            LimeLog.info("New PC (" + fakeDetails.name + ") is UUID " + fakeDetails.uuid);
 
             // Start a polling thread for this machine
             addTuple(fakeDetails);
             return true;
-        }
-        else {
+        } else {
             return false;
         }
     }
@@ -613,7 +799,7 @@ public class ComputerManagerService extends Service {
                 }
             }
         };
-        tuple.pollingThread.setName("Parallel Poll - "+tuple.address+" - "+tuple.existingDetails.name);
+        tuple.pollingThread.setName("Parallel Poll - " + tuple.address + " - " + tuple.existingDetails.name);
         tuple.pollingThread.start();
     }
 
@@ -693,15 +879,14 @@ public class ComputerManagerService extends Service {
 
     private boolean pollComputer(ComputerDetails details) throws InterruptedException {
         // Poll all addresses in parallel to speed up the process
-        LimeLog.info("Starting parallel poll for "+details.name+" ("+details.localAddress +", "+details.remoteAddress +", "+details.manualAddress+", "+details.ipv6Address+")");
+        LimeLog.info("Starting parallel poll for " + details.name + " (" + details.localAddress + ", " + details.remoteAddress + ", " + details.manualAddress + ", " + details.ipv6Address + ")");
         ComputerDetails polledDetails = parallelPollPc(details);
-        LimeLog.info("Parallel poll for "+details.name+" returned address: "+details.activeAddress);
+        LimeLog.info("Parallel poll for " + details.name + " returned address: " + details.activeAddress);
 
         if (polledDetails != null) {
             details.update(polledDetails);
             return true;
-        }
-        else {
+        } else {
             return false;
         }
     }
@@ -773,8 +958,7 @@ public class ComputerManagerService extends Service {
                         // If we've already reported an app list successfully,
                         // wait the full polling period
                         pollEvent.wait(APPLIST_POLLING_PERIOD_MS);
-                    }
-                    else {
+                    } else {
                         // If we've failed to get an app list so far, retry much earlier
                         pollEvent.wait(APPLIST_FAILED_POLLING_RETRY_MS);
                     }
@@ -832,15 +1016,14 @@ public class ComputerManagerService extends Service {
                                 synchronized (tuple.networkLock) {
                                     appList = http.getAppListRaw();
                                 }
-                            }
-                            else {
+                            } else {
                                 // No polling is happening now, so we just call it directly
                                 appList = http.getAppListRaw();
                             }
 
                             List<NvApp> list = NvHTTP.getAppListByReader(new StringReader(appList));
                             if (list.isEmpty()) {
-                                LimeLog.warning("Empty app list received from "+computer.uuid);
+                                LimeLog.warning("Empty app list received from " + computer.uuid);
 
                                 // The app list might actually be empty, so if we get an empty response a few times
                                 // in a row, we'll go ahead and believe it.
@@ -860,7 +1043,8 @@ public class ComputerManagerService extends Service {
                                         if (cacheOut != null) {
                                             cacheOut.close();
                                         }
-                                    } catch (IOException ignored) {}
+                                    } catch (IOException ignored) {
+                                    }
                                 }
 
                                 // Reset empty count if it wasn't empty this time
@@ -877,16 +1061,16 @@ public class ComputerManagerService extends Service {
                                 if (listener != null && thread != null) {
                                     listener.notifyComputerUpdated(computer);
                                 }
-                            }
-                            else if (appList.isEmpty()) {
-                                LimeLog.warning("Null app list received from "+computer.uuid);
+                            } else if (appList.isEmpty()) {
+                                LimeLog.warning("Null app list received from " + computer.uuid);
                             }
                         } catch (IOException e) {
                             e.printStackTrace();
                         } catch (XmlPullParserException e) {
                             e.printStackTrace();
                         }
-                    } while (waitPollingDelay());
+                    }
+                    while (waitPollingDelay());
                 }
             };
             thread.setName("App list polling thread for " + computer.name);

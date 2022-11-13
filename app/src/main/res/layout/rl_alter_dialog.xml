@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#00000000"
+    >
+    <TextView
+        android:id="@+id/tv_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_text"
+        android:text="AlterDialog"
+        android:paddingVertical="107dp"
+        android:textSize="53dp"
+        android:textColor="#FFFFFF"
+        android:textAlignment="center"
+        android:gravity="center_horizontal" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="107dp"
+        android:layout_below="@+id/tv_message"
+        android:orientation="horizontal"
+        >
+        <TextView
+            android:id="@+id/tv_recommend_btn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="left"
+            android:background="@drawable/bg_round_selected_left_bottom"
+            android:textSize="38dp"
+            android:textAlignment="center"
+            android:gravity="center_horizontal"
+            android:textColor="#000000"
+            android:paddingTop="30dp"
+            />
+
+        <TextView
+            android:id="@+id/tv_middle_btn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone"
+            android:textSize="38dp"
+            android:textAlignment="center"
+            android:gravity="center_horizontal"
+            android:background="@drawable/bg_normal"
+            android:textColor="#000000"
+            android:paddingTop="30dp"/>
+
+        <TextView
+            android:id="@+id/tv_right_btn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_round_normal_right_bottom"
+            android:textSize="38dp"
+            android:textAlignment="center"
+            android:gravity="center_horizontal"
+            android:textColor="#000000"
+            android:paddingTop="30dp"
+            />
+
+    </LinearLayout>
+
+</RelativeLayout>

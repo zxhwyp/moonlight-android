@@ -15,6 +15,8 @@ import java.security.cert.*;
 import java.util.Arrays;
 import java.util.Locale;
 
+import javax.crypto.SecretKey;
+
 public class PairingManager {
 
     private NvHTTP http;
@@ -24,6 +26,7 @@ public class PairingManager {
     private byte[] pemCertBytes;
 
     private X509Certificate serverCert;
+    private String severCertString;
     
     public enum PairState {
         NOT_PAIRED,
@@ -38,6 +41,10 @@ public class PairingManager {
         this.cert = cryptoProvider.getClientCertificate();
         this.pemCertBytes = cryptoProvider.getPemEncodedClientCertificate();
         this.pk = cryptoProvider.getClientPrivateKey();
+    }
+
+    public String getPairedCertString(){
+        return severCertString;
     }
     
     final private static char[] hexArray = "0123456789ABCDEF".toCharArray();
@@ -201,6 +208,8 @@ public class PairingManager {
         if (!NvHTTP.getXmlString(getCert, "paired", true).equals("1")) {
             return PairState.FAILED;
         }
+
+        severCertString=getCert;
 
         // Save this cert for retrieval later
         serverCert = extractPlainCert(getCert);
