@@ -1,11 +1,15 @@
 package com.limelight.nvstream.http;
 
+import com.limelight.LimeLog;
+
 import java.security.cert.X509Certificate;
 
 
 public class ComputerDetails {
     public enum State {
-        ONLINE, OFFLINE, UNKNOWN
+        ONLINE,
+        OFFLINE,
+        UNKNOWN
     }
 
     // Persistent attributes
@@ -30,18 +34,18 @@ public class ComputerDetails {
         state = State.UNKNOWN;
     }
 
-    public ComputerDetails(String uuid,String name,String localAddress,String remoteAddress,String manualAddress,String macAddress,X509Certificate serverCert,String activeAddress,int runningGameId){
-        this.uuid=uuid;
-        this.name=name;
-        this.localAddress=localAddress;
-        this.remoteAddress=remoteAddress;
-        this.manualAddress=manualAddress;
-        this.macAddress=macAddress;
-        this.serverCert=serverCert;
-        this.activeAddress=activeAddress;
-        this.runningGameId=runningGameId;
-        this.pairState=PairingManager.PairState.PAIRED;
-        this.state=State.ONLINE;
+    public ComputerDetails(String uuid, String name, String localAddress, String remoteAddress, String manualAddress, String macAddress, X509Certificate serverCert, String activeAddress, int runningGameId) {
+        this.uuid = uuid;
+        this.name = name;
+        this.localAddress = localAddress;
+        this.remoteAddress = remoteAddress;
+        this.manualAddress = manualAddress;
+        this.macAddress = macAddress;
+        this.serverCert = serverCert;
+        this.activeAddress = activeAddress;
+        this.runningGameId = runningGameId;
+        this.pairState = PairingManager.PairState.PAIRED;
+        this.state = State.ONLINE;
     }
 
     public ComputerDetails(ComputerDetails details) {
@@ -76,6 +80,7 @@ public class ComputerDetails {
             this.serverCert = details.serverCert;
         }
         this.pairState = details.pairState;
+        LimeLog.info("polled pair state:" + this.pairState);
         this.runningGameId = details.runningGameId;
         this.rawAppList = details.rawAppList;
     }

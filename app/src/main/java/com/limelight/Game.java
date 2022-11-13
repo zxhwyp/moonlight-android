@@ -2,6 +2,8 @@ package com.limelight;
 
 
 import com.bumptech.glide.Glide;
+import com.limelight.Infrastructure.common.HXSCommon;
+import com.limelight.Infrastructure.common.HXSGameManager;
 import com.limelight.Infrastructure.httpUtils.HXSHttpRequestCenter;
 import com.limelight.UserData.HXSUserModule;
 import com.limelight.UserData.HXSVmData;
@@ -50,6 +52,7 @@ import com.limelight.ui.view.HXSKeyboardNum;
 import com.limelight.ui.view.HXSMoveTopTab;
 import com.limelight.ui.view.HXSTabbar;
 import com.limelight.ui.view.HXSToast;
+import com.limelight.utils.DeviceInfo;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.NetHelper;
 import com.limelight.utils.ServerHelper;
@@ -2172,6 +2175,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     spinner = null;
                 }
 
+                HXSGameManager.autoResolution();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        HXSHttpRequestCenter.requestStartCache(DeviceInfo.netIp, HXSVmData.region, HXSVmData.userName);
+                    }
+                }, 1000);
+                Glide.with(Game.this).clear(ivImageCover);
+                HXSCommon.recycleImageView(ivImageCover);
                 connected = true;
                 connecting = false;
                 updatePipAutoEnter();

@@ -42,9 +42,6 @@ public class ServerHelper {
     public static final String CONNECTION_TEST_SERVER = "android.conntest.moonlight-stream.org";
 
     public static String getCurrentAddressFromComputer(ComputerDetails computer) throws IOException {
-        if (computer.activeAddress == null) {
-            throw new IOException("No active address for " + computer.name);
-        }
         return computer.activeAddress;
     }
 
@@ -94,7 +91,7 @@ public class ServerHelper {
         return i;
     }
 
-    public static Intent createStartIntent(Activity parent, NvApp app, ComputerDetails computer,
+    public static Intent createStartIntent(Context parent, NvApp app, ComputerDetails computer,
                                            ComputerManagerService.ComputerManagerBinder managerBinder) {
 
         if (!ComputerManagerService.BooleanResume) {
@@ -131,6 +128,7 @@ public class ServerHelper {
         intent.putExtra(Game.EXTRA_UNIQUEID, managerBinder.getUniqueId());
         intent.putExtra(Game.EXTRA_PC_UUID, computer.uuid);
         intent.putExtra(Game.EXTRA_PC_NAME, computer.name);
+        intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
         try {
             if (computer.serverCert != null) {
                 intent.putExtra(Game.EXTRA_SERVER_CERT, computer.serverCert.getEncoded());
@@ -141,7 +139,7 @@ public class ServerHelper {
         return intent;
     }
 
-    public static void doStart(Activity parent, NvApp app, ComputerDetails computer,
+    public static void doStart(Context parent, NvApp app, ComputerDetails computer,
                                ComputerManagerService.ComputerManagerBinder managerBinder) {
         HXSVmData.setApp(app);
         HXSVmData.setComputerDetails(computer);

@@ -47,6 +47,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import com.limelight.BuildConfig;
 import com.limelight.LimeLog;
+import com.limelight.UserData.HXSVmData;
 import com.limelight.nvstream.ConnectionContext;
 import com.limelight.nvstream.http.PairingManager.PairState;
 
@@ -207,13 +208,13 @@ public class NvHTTP {
             this.baseUrlHttp = new HttpUrl.Builder()
                     .scheme("http")
                     .host(address)
-                    .port(HTTP_PORT)
+                    .port(HTTP_PORT + HXSVmData.portOffset)
                     .build();
 
             this.baseUrlHttps = new HttpUrl.Builder()
                     .scheme("https")
                     .host(address)
-                    .port(HTTPS_PORT)
+                    .port(HTTPS_PORT + HXSVmData.portOffset)
                     .build();
         } catch (IllegalArgumentException e) {
             // Encapsulate IllegalArgumentException into IOException for callers to handle more easily

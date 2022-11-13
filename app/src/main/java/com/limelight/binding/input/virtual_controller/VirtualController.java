@@ -11,6 +11,7 @@ import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.limelight.LimeLog;
@@ -51,6 +52,7 @@ public class VirtualController {
     };
 
     private FrameLayout frame_layout = null;
+    private RelativeLayout relative_layout = null;
 
     ControllerMode currentMode = ControllerMode.Active;
     ControllerInputContext inputContext = new ControllerInputContext();
@@ -63,7 +65,9 @@ public class VirtualController {
         this.frame_layout = layout;
         this.context = context;
         this.handler = new Handler(Looper.getMainLooper());
+        relative_layout = new RelativeLayout(context);
 
+        frame_layout.addView(relative_layout, 1);
     }
 
     Handler getHandler() {
@@ -74,6 +78,7 @@ public class VirtualController {
         for (VirtualControllerElement element : elements) {
             element.setVisibility(View.INVISIBLE);
         }
+        relative_layout.setVisibility(View.INVISIBLE);
 
     }
 
@@ -82,11 +87,13 @@ public class VirtualController {
             element.setVisibility(View.VISIBLE);
         }
 
+        relative_layout.setVisibility(View.VISIBLE);
+
     }
 
     public void removeElements() {
         for (VirtualControllerElement element : elements) {
-            frame_layout.removeView(element);
+            relative_layout.removeView(element);
         }
         elements.clear();
 
@@ -104,7 +111,9 @@ public class VirtualController {
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(width, height);
         layoutParams.setMargins(x, y, 0, 0);
 
-        frame_layout.addView(element, layoutParams);
+        relative_layout.addView(element, layoutParams);
+        element.height = height;
+        element.width = width;
     }
 
     public List<VirtualControllerElement> getElements() {
@@ -118,6 +127,7 @@ public class VirtualController {
     }
 
     public void refreshLayout() {
+        relative_layout.removeAllViews();
         removeElements();
 
         DisplayMetrics screen = context.getResources().getDisplayMetrics();
