@@ -13,6 +13,7 @@ android {
 
         versionName "10.9"
         versionCode = 296
+        project.archivesBaseName="HXStreamKit"
 
         // Generate native debug symbols to allow Google Play to symbolicate our native crashes
         ndk.debugSymbolLevel = 'FULL'

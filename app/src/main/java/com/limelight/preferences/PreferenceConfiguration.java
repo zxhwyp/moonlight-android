@@ -321,8 +321,8 @@ public class PreferenceConfiguration {
 
     public static void saveSettingEntity(HXSSettingEntity entity, Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        int bitRate, frameRate, width, height, hevc,basisSetting;
-        boolean hdr,stretchVideo;
+        int bitRate, frameRate, width, height, hevc,basisSetting, hdr;
+        boolean stretchVideo;
 
         switch (entity.basisSettings) {
             case BasisSetting_Smooth:
@@ -377,23 +377,20 @@ public class PreferenceConfiguration {
                 break;
         }
         stretchVideo = entity.stretchVideo;
-        if (entity.useHevc > 0) {
-            hevc = FORCE_H265_OFF;
-        } else {
-            hevc = FORCE_H265_ON;
-        }
-        if (entity.enableHdr > 0) {
-            hdr = false;
-        } else {
-            hdr = true;
-        }
+        //        if (entity.useHevc > 0) {
+        //            hevc = FORCE_H265_OFF;
+        //        } else {
+        //            hevc = FORCE_H265_ON;
+        //        }
+        hevc = entity.useHevc;
+        hdr = entity.enableHdr;
         prefs.edit()
                 .putInt(RESOLUTION_WIDTH_STRING, width)
                 .putInt(RESOLUTION_HEIGHT_STRING, height)
                 .putInt(FRAME_PER_SECOND_STRING,frameRate)
                 .putInt(BITRATE_PREF_STRING,bitRate)
                 .putInt(VIDEO_FORMATE_STRING,hevc)
-                .putBoolean(ENABLE_HDR_PREF_STRING,hdr)
+                .putInt(ENABLE_HDR_PREF_STRING,hdr)
                 .putInt(BASIS_SETTING_STRING,basisSetting)
                 .putBoolean(STRETCH_PREF_STRING,stretchVideo)
                 .apply();
@@ -469,14 +466,23 @@ public class PreferenceConfiguration {
         entity.stretchVideo =prefs.getBoolean(STRETCH_PREF_STRING, DEFAULT_STRETCH);
         entity.useHevc = prefs.getInt(VIDEO_FORMATE_STRING,-1);
 
-        entity.useHevc = -1;
-        if (prefs.getBoolean(ENABLE_HDR_PREF_STRING,true)){
-            entity.enableHdr = -1;
-        }else {
-            entity.enableHdr = 1;
+        //        entity.useHevc = -1;
+        //        if (prefs.getBoolean(ENABLE_HDR_PREF_STRING,true)){
+        //            entity.enableHdr = -1;
+        //        }else {
+        //            entity.enableHdr = 1;
+        //        }
+        try {
+            entity.enableHdr = prefs.getInt(ENABLE_HDR_PREF_STRING,-1);
+        } catch (ClassCastException error) {
+            if (prefs.getBoolean(ENABLE_HDR_PREF_STRING,true)){
+                entity.enableHdr = -1;
+            }else {
+                entity.enableHdr = 1;
+            }
         }
 
-        entity.enableHdr = -1;
+        //        entity.enableHdr = -1;
         HXSLog.info("entity"+entity.toString());
         return entity;
     }

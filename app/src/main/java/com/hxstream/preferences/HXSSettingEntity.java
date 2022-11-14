@@ -12,6 +12,9 @@ public class HXSSettingEntity {
         }
         return instance;
     }
+    /*
+     * 分辨率设置
+     * */
     public static enum ResolutionOptions{
         ResolutionOptions_720P(0),
         ResolutionOptions_1080P(1),
@@ -25,6 +28,9 @@ public class HXSSettingEntity {
             return value;
         }
     }
+    /*
+     * 画质设置
+     * */
     public static enum BasisSettings{
         BasisSetting_Smooth(1),//流畅画质
         BasisSetting_Standard(2),//标准画质
@@ -41,10 +47,25 @@ public class HXSSettingEntity {
         }
     }
     public ResolutionOptions resolution;
+    /*
+     * 帧数
+     * */
     public int frameRate;
+    /*
+     * 码流
+     * */
     public int bitrate;
+    /*
+     *  虚拟手柄开关 0-关闭  3-打开
+     */
     public int onScreenControls;
+    /*
+     * 解码方式
+     * */
     public int useHevc;
+    /*
+     * 编码方式
+     * */
     public int enableHdr;
     public BasisSettings basisSettings;
     public boolean stretchVideo = false;
