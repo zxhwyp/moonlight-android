@@ -618,6 +618,7 @@ public class PreferenceConfiguration {
 
         }
         config.onlyL3R3 = prefs.getBoolean(ONLY_L3_R3_PREF_STRING, ONLY_L3_R3_DEFAULT);
+        config.disableFrameDrop = prefs.getBoolean(DISABLE_FRAME_DROP_PREF_STRING, DEFAULT_DISABLE_FRAME_DROP);
         config.enableHdr = true;
         config.enablePip = prefs.getBoolean(ENABLE_PIP_PREF_STRING, DEFAULT_ENABLE_PIP);
         config.enablePerfOverlay = prefs.getBoolean(ENABLE_PERF_OVERLAY_STRING, DEFAULT_ENABLE_PERF_OVERLAY);
