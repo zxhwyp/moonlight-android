@@ -5,23 +5,11 @@
     android:layout_height="match_parent"
     tools:context=".Game">
 
-    <View
-        android:id="@+id/backgroundTouchView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="center" />
-
     <com.limelight.ui.StreamView
         android:id="@+id/surfaceView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_gravity="center"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:focusedByDefault="true"
-        android:defaultFocusHighlightEnabled="false">
-        <requestFocus />
-    </com.limelight.ui.StreamView>
+        android:layout_gravity="center" />
 
     <TextView
         android:id="@+id/performanceOverlay"
@@ -62,7 +50,7 @@
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:visibility="gone" />
 
-    <!--  <com.limelight.ui.view.HXSDragView
+    <!--  <com.hxstream.ui.view.HXSDragView
           android:id="@+id/dv_drag_view"
           android:layout_width="match_parent"
           android:layout_height="match_parent"
@@ -73,7 +61,7 @@
           app:foregroundImage="@mipmap/ic_tabbar"
           app:marginTop="400"
           app:welt="true" >
-      </com.limelight.ui.view.HXSDragView>
+      </com.hxstream.ui.view.HXSDragView>
   -->
     <com.limelight.ui.view.HXSControlTab
         android:id="@+id/tab_control"

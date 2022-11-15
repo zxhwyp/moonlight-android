@@ -78,7 +78,6 @@ public class AnalogStick extends VirtualControllerElement {
     private int iconButtonSelectedLeft = R.mipmap.ic_stick_button_left_pressed;
     private int alpha = 255;
 
-
     /**
      * Movement states of the analog sick.
      */
@@ -230,7 +229,6 @@ public class AnalogStick extends VirtualControllerElement {
         this.iconBackground = icon;
     }
 
-
     @Override
     protected void onElementDraw(Canvas canvas) {
         // set transparent background
@@ -253,14 +251,17 @@ public class AnalogStick extends VirtualControllerElement {
             d.setAlpha(alpha);
             d.draw(canvas);
         }
+
+
         paint.setColor(getDefaultColor());
         // draw dead zone
-        // canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
+        //        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
 
         // draw stick depending on state
         switch (stick_state) {
             case NO_MOVEMENT: {
                 paint.setColor(getDefaultColor());
+
                 if (iconButtonLeft < 0) {
                     canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_analog_stick, paint);
                 } else {
@@ -297,7 +298,7 @@ public class AnalogStick extends VirtualControllerElement {
         invalidate();
     }
 
-    private void updatePosition(long eventTime) {
+    private void updatePosition() {
         // get 100% way
         float complete = radius_complete - radius_analog_stick;
 
@@ -314,7 +315,7 @@ public class AnalogStick extends VirtualControllerElement {
         // We also release the deadzone if the user keeps the stick pressed for a bit to allow
         // them to make precise movements.
         stick_state = (stick_state == STICK_STATE.MOVED_ACTIVE ||
-                eventTime - timeLastClick > timeoutDeadzone ||
+                System.currentTimeMillis() - timeLastClick > timeoutDeadzone ||
                 movement_radius > radius_dead_zone) ?
                 STICK_STATE.MOVED_ACTIVE : STICK_STATE.MOVED_IN_DEAD_ZONE;
 
@@ -337,10 +338,6 @@ public class AnalogStick extends VirtualControllerElement {
         movement_radius = getMovementRadius(relative_x, relative_y);
         movement_angle = getAngle(relative_x, relative_y);
 
-        // pass touch event to parent if out of outer circle
-        if (movement_radius > radius_complete && !isPressed())
-            return false;
-
         // chop radius if out of outer circle and already pressed
         if (movement_radius > (radius_complete - radius_analog_stick)) {
             // not pressed already, so ignore event from outer circle
@@ -353,12 +350,13 @@ public class AnalogStick extends VirtualControllerElement {
         // handle event depending on action
         switch (event.getActionMasked()) {
             // down event (touch event)
-            case MotionEvent.ACTION_DOWN: {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN: {
                 // set to dead zoned, will be corrected in update position if necessary
                 stick_state = STICK_STATE.MOVED_IN_DEAD_ZONE;
                 // check for double click
                 if (lastClickState == CLICK_STATE.SINGLE &&
-                        event.getEventTime() - timeLastClick <= timeoutDoubleClick) {
+                        timeLastClick + timeoutDoubleClick > System.currentTimeMillis()) {
                     click_state = CLICK_STATE.DOUBLE;
                     notifyOnDoubleClick();
                 } else {
@@ -366,14 +364,14 @@ public class AnalogStick extends VirtualControllerElement {
                     notifyOnClick();
                 }
                 // reset last click timestamp
-                timeLastClick = event.getEventTime();
+                timeLastClick = System.currentTimeMillis();
                 // set item pressed and update
                 setPressed(true);
                 break;
             }
             // up event (revoke touch)
-            case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP: {
+            case MotionEvent.ACTION_UP:
+            {
                 setPressed(false);
                 break;
             }
@@ -383,7 +381,7 @@ public class AnalogStick extends VirtualControllerElement {
 
         if (isPressed()) {
             // when is pressed calculate new positions (will trigger movement if necessary)
-            updatePosition(event.getEventTime());
+            updatePosition();
         } else {
             stick_state = STICK_STATE.NO_MOVEMENT;
             notifyOnRevoke();

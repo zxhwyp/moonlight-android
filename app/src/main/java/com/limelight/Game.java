@@ -363,8 +363,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // to work on areas outside of the StreamView itself. We use a separate View
         // for this rather than just handling it at the Activity level, because that
         // allows proper touch splitting, which the OSC relies upon.
-        View backgroundTouchView = findViewById(R.id.backgroundTouchView);
-        backgroundTouchView.setOnTouchListener(this);
 
         boolean needsInputBatching = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -378,14 +376,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                             InputDevice.SOURCE_CLASS_POSITION | // Touchpads
                             InputDevice.SOURCE_CLASS_TRACKBALL // Mice (pointer capture)
             );
-            backgroundTouchView.requestUnbufferedDispatch(
-                    InputDevice.SOURCE_CLASS_BUTTON | // Keyboards
-                            InputDevice.SOURCE_CLASS_JOYSTICK | // Gamepads
-                            InputDevice.SOURCE_CLASS_POINTER | // Touchscreens and mice (w/o pointer capture)
-                            InputDevice.SOURCE_CLASS_POSITION | // Touchpads
-                            InputDevice.SOURCE_CLASS_TRACKBALL // Mice (pointer capture)
-            );
-
             // Since the OS isn't going to batch for us, we have to batch mouse events to
             // avoid triggering a bug in GeForce Experience that can lead to massive latency.
             needsInputBatching = true;
@@ -601,22 +591,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         keyboardTranslator = new KeyboardTranslator();
 
         connection = conn;
-        initializeTouchContexts(touchType);
 
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(controllerHandler, null);
-        inputManager.registerInputDeviceListener(keyboardTranslator, null);
 
-        // Initialize touch contexts
-        for (int i = 0; i < touchContextMap.length; i++) {
-            if (!prefConfig.touchscreenTrackpad) {
-                touchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
-            } else {
-                touchContextMap[i] = new RelativeTouchContext(conn, i,
-                        REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
-                        streamView, prefConfig);
-            }
-        }
+        initializeTouchContexts(touchType);
 
         // Use sustained performance mode on N+ to ensure consistent
         // CPU availability
@@ -624,25 +603,25 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             getWindow().setSustainedPerformanceMode(true);
         }
 
-        if (prefConfig.onscreenController) {
-            // create virtual onscreen controller
-            virtualController = new VirtualController(controllerHandler,
-                    (FrameLayout) streamView.getParent(),
-                    this);
-            virtualController.refreshLayout();
-            virtualController.show();
+        // if (prefConfig.onscreenController) {
+        // create virtual onscreen controller
+        virtualController = new VirtualController(controllerHandler,
+                (FrameLayout) streamView.getParent(),
+                this);
+        virtualController.refreshLayout();
+        virtualController.show();
 
-            alpha = HXStreamViewPreference.getSeekAlpha();
-            scrollerSpeed = HXStreamViewPreference.getSeekSpeed();
-            controllerVisible = HXStreamViewPreference.getSwitchControllerVisible();
-            mouseShow = HXStreamViewPreference.getMouseVisible();
-            useSourceKeyboard = HXStreamViewPreference.getUseSourceKeyboard();
-            isTouchPadOpen = HXStreamViewPreference.getTouchPadOpen();
-            virtualController.setAlpha(alpha * 255 / 50);
-            if (!controllerVisible) {
-                virtualController.hide();
-            }
+        alpha = HXStreamViewPreference.getSeekAlpha();
+        scrollerSpeed = HXStreamViewPreference.getSeekSpeed();
+        controllerVisible = HXStreamViewPreference.getSwitchControllerVisible();
+        mouseShow = HXStreamViewPreference.getMouseVisible();
+        useSourceKeyboard = HXStreamViewPreference.getUseSourceKeyboard();
+        isTouchPadOpen = HXStreamViewPreference.getTouchPadOpen();
+        virtualController.setAlpha(alpha * 255 / 50);
+        if (!controllerVisible) {
+            virtualController.hide();
         }
+        // }
 
         if (prefConfig.usbDriver) {
             // Start the USB driver
@@ -1180,9 +1159,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (controllerHandler != null) {
             inputManager.unregisterInputDeviceListener(controllerHandler);
         }
-        if (keyboardTranslator != null) {
-            inputManager.unregisterInputDeviceListener(keyboardTranslator);
-        }
 
         if (lowLatencyWifiLock != null) {
             lowLatencyWifiLock.release();
@@ -1412,7 +1388,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (!handled) {
             // Try the keyboard handler
-            short translated = keyboardTranslator.translate(event.getKeyCode(), event.getDeviceId());
+            short translated = keyboardTranslator.translate(event.getKeyCode());
             if (translated == 0) {
                 return false;
             }
@@ -1497,7 +1473,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (!handled) {
             // Try the keyboard handler
-            short translated = keyboardTranslator.translate(event.getKeyCode(), event.getDeviceId());
+            short translated = keyboardTranslator.translate(event.getKeyCode());
             if (translated == 0) {
                 return false;
             }
@@ -2338,7 +2314,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void keyboardEvent(boolean buttonDown, short keyCode) {
-        short keyMap = keyboardTranslator.translate(keyCode, -1);
+        short keyMap = keyboardTranslator.translate(keyCode);
         if (keyMap != 0) {
             // handleSpecialKeys() takes the Android keycode
             if (handleSpecialKeys(keyCode, buttonDown)) {
@@ -2437,7 +2413,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 case TOUCH_TYPE_RELATIVE:
                     touchContextMap[i] = new RelativeTouchContext(conn, i,
                             REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
-                            streamView, prefConfig);
+                            streamView);
                     break;
                 case TOUCH_TYPE_ABSOLUTE:
                     touchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
@@ -2628,8 +2604,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     public void setControllerVisible(boolean visible) {
         if (visible) {
+            LimeLog.info("log setControllerVisible true");
+
             virtualController.show();
         } else {
+            LimeLog.info("log setControllerVisible true");
             virtualController.hide();
         }
     }

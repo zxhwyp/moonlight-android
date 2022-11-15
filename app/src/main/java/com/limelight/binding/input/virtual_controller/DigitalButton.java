@@ -14,6 +14,8 @@ import android.view.MotionEvent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * This is a digital button on screen element. It is used to get click and double click user input.
@@ -41,17 +43,23 @@ public class DigitalButton extends VirtualControllerElement {
         void onRelease();
     }
 
+    /**
+     *
+     */
+    private class TimerLongClickTimerTask extends TimerTask {
+        @Override
+        public void run() {
+            onLongClickCallback();
+        }
+    }
+
     private List<DigitalButtonListener> listeners = new ArrayList<>();
     private String text = "";
     private int icon = -1;
     private int alpha = 255;
     private long timerLongClickTimeout = 3000;
-    private final Runnable longClickRunnable = new Runnable() {
-        @Override
-        public void run() {
-            onLongClickCallback();
-        }
-    };
+    private Timer timerLongClick = null;
+    private TimerLongClickTimerTask longClickTimerTask = null;
 
     private final Paint paint = new Paint();
     private final RectF rect = new RectF();
@@ -134,8 +142,7 @@ public class DigitalButton extends VirtualControllerElement {
         invalidate();
     }
 
-    @Override
-    void setAlpha(int alpha) {
+    public void setAlpha(int alpha) {
         this.alpha = alpha;
         invalidate();
     }
@@ -177,8 +184,9 @@ public class DigitalButton extends VirtualControllerElement {
             listener.onClick();
         }
 
-        virtualController.getHandler().removeCallbacks(longClickRunnable);
-        virtualController.getHandler().postDelayed(longClickRunnable, timerLongClickTimeout);
+        timerLongClick = new Timer();
+        longClickTimerTask = new TimerLongClickTimerTask();
+        timerLongClick.schedule(longClickTimerTask, timerLongClickTimeout);
     }
 
     private void onLongClickCallback() {
@@ -197,7 +205,12 @@ public class DigitalButton extends VirtualControllerElement {
         }
 
         // We may be called for a release without a prior click
-        virtualController.getHandler().removeCallbacks(longClickRunnable);
+        if (timerLongClick != null) {
+            timerLongClick.cancel();
+        }
+        if (longClickTimerTask != null) {
+            longClickTimerTask.cancel();
+        }
     }
 
     @Override
@@ -208,7 +221,8 @@ public class DigitalButton extends VirtualControllerElement {
         int action = event.getActionMasked();
 
         switch (action) {
-            case MotionEvent.ACTION_DOWN: {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN: {
                 movingButton = null;
                 setPressed(true);
                 onClickCallback();
@@ -223,7 +237,8 @@ public class DigitalButton extends VirtualControllerElement {
                 return true;
             }
             case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP: {
+            case MotionEvent.ACTION_UP:
+            {
                 setPressed(false);
                 onReleaseCallback();
 

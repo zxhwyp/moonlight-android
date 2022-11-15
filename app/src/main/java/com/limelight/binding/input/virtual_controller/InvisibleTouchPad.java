@@ -16,7 +16,6 @@ import static com.limelight.Game.REFERENCE_VERT_RES;
 public class InvisibleTouchPad extends VirtualControllerElement {
 
     TouchContext aTouchContextMap;
-
     private enum STICK_STATE {
         NO_MOVEMENT,
         MOVED_IN_DEAD_ZONE,
@@ -36,7 +35,7 @@ public class InvisibleTouchPad extends VirtualControllerElement {
 
     protected InvisibleTouchPad(VirtualController controller, Context context, int elementId) {
         super(controller, context, elementId);
-        aTouchContextMap = new MoveOnlyTouchContext(Game.getInstance().conn, 0, REFERENCE_HORIZ_RES, REFERENCE_VERT_RES, this);
+        aTouchContextMap = new MoveOnlyTouchContext(Game.getInstance().conn,0,REFERENCE_HORIZ_RES,REFERENCE_VERT_RES,this);
     }
 
     @Override
@@ -57,7 +56,7 @@ public class InvisibleTouchPad extends VirtualControllerElement {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN: {
                 aTouchContextMap.setPointerCount(event.getPointerCount());
-                aTouchContextMap.touchDownEvent((int) event.getX(), (int) event.getY(), event.getEventTime(), true);
+                aTouchContextMap.touchDownEvent((int)event.getX(), (int)event.getY(), event.getEventTime(),true);
             }
             break;
             case MotionEvent.ACTION_MOVE:
@@ -65,8 +64,7 @@ public class InvisibleTouchPad extends VirtualControllerElement {
                     if (aTouchContextMap.getActionIndex() < event.getPointerCount()) {
                         aTouchContextMap.touchMoveEvent(
                                 (int) event.getHistoricalX(aTouchContextMap.getActionIndex(), i),
-                                (int) event.getHistoricalY(aTouchContextMap.getActionIndex(), i),
-                                event.getHistoricalEventTime(i));
+                                (int) event.getHistoricalY(aTouchContextMap.getActionIndex(), i),event.getEventTime());
                     }
                 }
                 break;

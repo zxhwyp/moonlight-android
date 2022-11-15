@@ -6,7 +6,6 @@ package com.limelight.binding.input.virtual_controller;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
@@ -23,8 +22,6 @@ public class DigitalPad extends VirtualControllerElement {
     public final static int DIGITAL_PAD_DIRECTION_UP = 2;
     public final static int DIGITAL_PAD_DIRECTION_RIGHT = 4;
     public final static int DIGITAL_PAD_DIRECTION_DOWN = 8;
-    List<DigitalPadListener> listeners = new ArrayList<>();
-
 
     private int iconLeftNormal = R.mipmap.ic_left_normal;
     private int iconRightNormal = R.mipmap.ic_right_normal;
@@ -36,6 +33,7 @@ public class DigitalPad extends VirtualControllerElement {
     private int iconDownPressed = R.mipmap.ic_down_pressed;
     private int alpha = 255;
     private int buttonMargin = 20;
+    List<DigitalPadListener> listeners = new ArrayList<>();
 
     private static final int DPAD_MARGIN = 5;
 
@@ -47,12 +45,6 @@ public class DigitalPad extends VirtualControllerElement {
 
     public void addDigitalPadListener(DigitalPadListener listener) {
         listeners.add(listener);
-    }
-
-    @Override
-    void setAlpha(int alpha) {
-        this.alpha = alpha;
-        invalidate();
     }
 
     @Override
@@ -113,6 +105,12 @@ public class DigitalPad extends VirtualControllerElement {
 
     }
 
+    @Override
+    public void setAlpha(int alpha) {
+        this.alpha = alpha;
+        invalidate();
+    }
+
     private void drawDigitalPad(int upIcon, int downIcon, int leftIcon, int rightIcon, Canvas canvas) {
         Drawable drawableUp = getResources().getDrawable(upIcon);
         drawableUp.setBounds((int) getPercent(getWidth(), 33), 0, (int) getPercent(getWidth(), 66), getHeight() / 2 - getHeight() / buttonMargin);
@@ -132,7 +130,6 @@ public class DigitalPad extends VirtualControllerElement {
         drawableRight.draw(canvas);
     }
 
-
     private void newDirectionCallback(int direction) {
         _DBG("direction: " + direction);
 
@@ -147,6 +144,7 @@ public class DigitalPad extends VirtualControllerElement {
         // get masked (not specific to a pointer) action
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN:
             case MotionEvent.ACTION_MOVE: {
                 direction = 0;
 
@@ -168,7 +166,8 @@ public class DigitalPad extends VirtualControllerElement {
                 return true;
             }
             case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP: {
+            case MotionEvent.ACTION_UP:
+            {
                 direction = 0;
                 newDirectionCallback(direction);
                 invalidate();

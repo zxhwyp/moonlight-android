@@ -162,8 +162,8 @@ public class StarVictoryDigitalButton extends VirtualControllerElement {
 
         paint.setColor(isPressed() ? pressedColor : getDefaultColor());
         paint.setStyle(Paint.Style.STROKE);
-//        canvas.drawRect(paint.getStrokeWidth(), paint.getStrokeWidth(),
-//                getWidth() - paint.getStrokeWidth(), getHeight() - paint.getStrokeWidth(), paint);
+        //        canvas.drawRect(paint.getStrokeWidth(), paint.getStrokeWidth(),
+        //                getWidth() - paint.getStrokeWidth(), getHeight() - paint.getStrokeWidth(), paint);
 
         if (icon != -1) {
             Drawable d = getResources().getDrawable(isPressed() ? iconPressed : icon);

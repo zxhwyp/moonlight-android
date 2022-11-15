@@ -261,7 +261,7 @@ public class AnalogStickRight extends VirtualControllerElement {
 
         paint.setColor(getDefaultColor());
         // draw dead zone
-//        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
+        //        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
 
         // draw stick depending on state
         switch (stick_state) {
@@ -373,12 +373,12 @@ public class AnalogStickRight extends VirtualControllerElement {
             }
             // up event (revoke touch)
             case MotionEvent.ACTION_UP:
-                {
+            {
                 setPressed(false);
                 break;
             }
             case MotionEvent.ACTION_POINTER_UP:
-            return false;
+                return false;
 
         }
 
