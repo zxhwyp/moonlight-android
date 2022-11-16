@@ -594,6 +594,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(controllerHandler, null);
+        inputManager.registerInputDeviceListener(keyboardTranslator, null);
 
         initializeTouchContexts(touchType);
 
@@ -603,25 +604,25 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             getWindow().setSustainedPerformanceMode(true);
         }
 
-        // if (prefConfig.onscreenController) {
-        // create virtual onscreen controller
-        virtualController = new VirtualController(controllerHandler,
-                (FrameLayout) streamView.getParent(),
-                this);
-        virtualController.refreshLayout();
-        virtualController.show();
+        if (prefConfig.onscreenController) {
+            // create virtual onscreen controller
+            virtualController = new VirtualController(controllerHandler,
+                    (FrameLayout) streamView.getParent(),
+                    this);
+            virtualController.refreshLayout();
+            virtualController.show();
 
-        alpha = HXStreamViewPreference.getSeekAlpha();
-        scrollerSpeed = HXStreamViewPreference.getSeekSpeed();
-        controllerVisible = HXStreamViewPreference.getSwitchControllerVisible();
-        mouseShow = HXStreamViewPreference.getMouseVisible();
-        useSourceKeyboard = HXStreamViewPreference.getUseSourceKeyboard();
-        isTouchPadOpen = HXStreamViewPreference.getTouchPadOpen();
-        virtualController.setAlpha(alpha * 255 / 50);
-        if (!controllerVisible) {
-            virtualController.hide();
+            alpha = HXStreamViewPreference.getSeekAlpha();
+            scrollerSpeed = HXStreamViewPreference.getSeekSpeed();
+            controllerVisible = HXStreamViewPreference.getSwitchControllerVisible();
+            mouseShow = HXStreamViewPreference.getMouseVisible();
+            useSourceKeyboard = HXStreamViewPreference.getUseSourceKeyboard();
+            isTouchPadOpen = HXStreamViewPreference.getTouchPadOpen();
+            virtualController.setAlpha(alpha * 255 / 50);
+            if (!controllerVisible) {
+                virtualController.hide();
+            }
         }
-        // }
 
         if (prefConfig.usbDriver) {
             // Start the USB driver
@@ -1388,7 +1389,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (!handled) {
             // Try the keyboard handler
-            short translated = keyboardTranslator.translate(event.getKeyCode());
+            short translated = keyboardTranslator.translate(event.getKeyCode(), event.getDeviceId());
             if (translated == 0) {
                 return false;
             }
@@ -1473,7 +1474,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (!handled) {
             // Try the keyboard handler
-            short translated = keyboardTranslator.translate(event.getKeyCode());
+            short translated = keyboardTranslator.translate(event.getKeyCode(), event.getDeviceId());
             if (translated == 0) {
                 return false;
             }
@@ -2314,7 +2315,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void keyboardEvent(boolean buttonDown, short keyCode) {
-        short keyMap = keyboardTranslator.translate(keyCode);
+        short keyMap = keyboardTranslator.translate(keyCode, -1);
         if (keyMap != 0) {
             // handleSpecialKeys() takes the Android keycode
             if (handleSpecialKeys(keyCode, buttonDown)) {

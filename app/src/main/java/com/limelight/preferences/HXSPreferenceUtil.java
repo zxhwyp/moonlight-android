@@ -44,7 +44,7 @@ public class HXSPreferenceUtil {
     public static boolean getBooleanTrue(String tableName, String keyName) {
         SharedPreferences sharedPreferences = HXSConstant.App
                 .getSharedPreferences(tableName, Context.MODE_PRIVATE);
-        return sharedPreferences.getBoolean(keyName, true);
+        return sharedPreferences.getBoolean(keyName, false);
     }
 
     public static float getFloat(String tableName, String keyName) {

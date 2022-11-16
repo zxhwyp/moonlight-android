@@ -13,6 +13,8 @@ import com.limelight.R;
 import com.hxstream.operation.HXSConnection;
 import com.limelight.ui.view.PickerView;
 
+import java.util.ArrayList;
+
 
 public class HXSSuspendDialog extends Dialog {
     public HXSSuspendDialog(@NonNull Context context) {
@@ -27,17 +29,35 @@ public class HXSSuspendDialog extends Dialog {
         super(context, cancelable, cancelListener);
     }
 
+    class SuspendData {
+        public String text;
+        public int minutes;
+
+        public SuspendData(String text, int minutes) {
+            this.minutes = minutes;
+            this.text = text;
+        }
+    }
+
+    private ArrayList<SuspendData> suspendDataList = new ArrayList<>();
+
     @Override
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.rl_suspend_dialog);
         PickerView pickerView = findViewById(R.id.pickView);
 
+        suspendDataList.add(new SuspendData("0.5 小时", 30));
+        suspendDataList.add(new SuspendData("1.0 小时", 60));
+        suspendDataList.add(new SuspendData("6 小时", 6 * 60));
+        suspendDataList.add(new SuspendData("12 小时", 12 * 60));
+
         PickerView.Adapter adapter = new PickerView.Adapter() {
 
             @Override
             public int getItemCount() {
-                return 51;
+                return suspendDataList.size();
             }
 
             @Override
@@ -57,7 +77,7 @@ public class HXSSuspendDialog extends Dialog {
 
             @Override
             public String getText(int index) {
-                return (index + 10) + " 分钟 ";
+                return suspendDataList.get(index).text;
             }
         };
         pickerView.setAdapter(adapter);
@@ -66,8 +86,7 @@ public class HXSSuspendDialog extends Dialog {
             @Override
             public void onClick(View view) {
                 int minutes = 0;
-                minutes = pickerView.getSelectedItemPosition();
-                minutes = minutes + 10;
+                minutes = suspendDataList.get(pickerView.getSelectedItemPosition()).minutes;
                 HXSLog.info("挂机时间" + minutes);
                 HXSConnection.getInstance().chooseSuspend(minutes);
                 dismiss();
